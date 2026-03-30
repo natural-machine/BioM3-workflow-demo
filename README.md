@@ -40,7 +40,7 @@ conda create -n biom3-env python=3.12
 conda activate biom3-env
 python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
 python -m pip install -r requirements_spark.txt
-python -m pip install git+https://github.com/natural-machine/BioM3-dev.git
+python -m pip install git+https://github.com/addison-nm/BioM3-dev.git
 ```
 
 ### 2. Clone this repository
