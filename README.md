@@ -80,7 +80,7 @@ ColabFold and BLAST each require their own conda environment:
 # ColabFold (Step 5)
 conda create -n colabfold -c conda-forge -c bioconda python=3.13 kalign2=2.04 hhsuite=3.3.0 mmseqs2=18.8cc5c
 conda activate colabfold
-pip install "colabfold[alphafold,openmm]" "jax[cuda]" "openmm[cuda12]"
+pip install "colabfold[alphafold,openmm]" "jax[cuda]==0.6.2" "openmm[cuda12]"
 
 # BLAST (Step 6)
 conda create -n blast-env
