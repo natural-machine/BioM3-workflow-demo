@@ -22,6 +22,7 @@ elif [[ "$_hostname" == x4* ]] || [[ "$_hostname" == aurora-uan* ]]; then
 
 elif [[ "$_hostname" == spark* ]]; then
     # DGX Spark — single NVIDIA GPU
+    # export BLAST_DB_PATH="data/databases/nr_blast/nr"  # uncomment for local BLAST NR searches
     echo "[environment.sh] Detected DGX Spark"
 
 else

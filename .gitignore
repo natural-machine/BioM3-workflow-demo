@@ -1,9 +1,7 @@
 # Project specific ignores
 data/
 weights/
-embeddings/
-finetuning/
-inference/
+outputs/
 logs/
 
 # Byte-compiled / optimized / DLL files

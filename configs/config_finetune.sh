@@ -19,7 +19,8 @@ export pretrained_weights="./weights/ProteoScribe/ProteoScribe_epoch200.pth"
 export finetune_last_n_blocks=1
 export finetune_last_n_layers=1
 
-# --- Logging ---
+# --- Logging (set wandb=False to disable wandb) ---
+export wandb=True
 export wandb_entity="thenaturalmachine"
 export wandb_project="BioM3-workflow-demo"
 export wandb_logging_dir="./logs"

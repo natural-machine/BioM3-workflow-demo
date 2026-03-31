@@ -1,33 +1,56 @@
 # BioM3 Workflow Demo
 
-A demonstration of the [BioM3 framework](https://openreview.net/forum?id=L1MyyRCAjX) (NeurIPS 2024) finetuning and sequence generation workflow. This repo shows how to take a pretrained ProteoScribe model and finetune it on a protein family dataset, then generate novel protein sequences guided by natural language prompts.
+A demonstration of the [BioM3 framework](https://openreview.net/forum?id=L1MyyRCAjX) (NeurIPS 2024) finetuning and sequence generation workflow. This repo shows how to take a pretrained ProteoScribe model and finetune it on a protein family dataset, generate novel protein sequences guided by natural language prompts, and evaluate the results with structure prediction and homology search.
 
 ## Overview
 
-The workflow consists of three steps:
+The workflow consists of eight steps:
 
 ```txt
 Input CSV (protein sequences + text descriptions)
         │
         ▼
-01_embedding.sh       → Embed sequences and text (PenCL → Facilitator → HDF5)
+01_embedding.sh            → Embed sequences and text (PenCL → Facilitator → HDF5)
         │
         ▼
-02_finetune.sh        → Finetune ProteoScribe on embedded data
+02_finetune.sh             → Finetune ProteoScribe on embedded data
         │
         ▼
-03_generate.sh        → Generate novel protein sequences from text prompts
+03_generate.sh             → Generate novel protein sequences from text prompts
+        │
+        ▼
+04_samples_to_fasta.sh     → Convert .pt output to FASTA files
+        │
+        ├──────────────────────────────┐
+        ▼                              ▼
+05_colabfold.sh            06_blast_search.sh
+  Structure prediction       BLAST homology search
+  (ColabFold/AlphaFold2)     + download reference PDBs
+        │                              │
+        └──────────┬───────────────────┘
+                   ▼
+        07_compare_structures.sh  → TMalign structural comparison
+                   │
+                   ▼
+        08_plot_results.sh        → Visualization (TM-score, RMSD, pLDDT)
 ```
 
-Each step is a standalone script in `scripts/` that wraps the BioM3 CLI entrypoints. Inputs and outputs are explicit — you control where data is read from and written to.
+Each step is a standalone script in `scripts/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel.
 
 ## Prerequisites
 
-This demo requires:
+**Required (Steps 1-4):**
 
 - A working installation of the [BioM3-dev](https://github.com/addison-nm/BioM3-dev) package
 - Pretrained model weights in the `weights/` directory
 - An NVIDIA GPU (tested on DGX Spark)
+
+**Optional (Steps 5-8):**
+
+- [ColabFold](https://github.com/sokrypton/ColabFold) — for structure prediction (Step 5)
+- [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html) — for homology search (Step 6)
+- [TMalign](https://zhanggroup.org/TM-align/) — for structural comparison (Step 7)
+- matplotlib, seaborn, pandas — for plotting (Step 8)
 
 ## Installation and setup
 
@@ -49,38 +72,61 @@ python -m pip install -r requirements_spark.txt
 python -m pip install git+https://github.com/addison-nm/BioM3-dev.git
 ```
 
-### 3. Weights
+### 3. Optional: ColabFold and BLAST environments
 
-Pretrained model weights are stored in a shared `BioM3-data-share` directory on each machine. This avoids duplicating large files across users and project copies. The local `weights/` directory is populated with symlinks that point to the shared files.
-
-#### Shared weights locations
-
-| Machine | Shared weights path |
-|---------|---------------------|
-| DGX Spark | `/data/data-share/BioM3-data-share/data/weights` |
-| Polaris (ALCF) | `/grand/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` |
-| Aurora (ALCF) | `/flare/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` |
-
-#### Creating the symlinks
-
-From the repo root, create a symlink for each weight subdirectory:
+ColabFold and BLAST each require their own conda environment:
 
 ```bash
-SHARED_WEIGHTS="/data/data-share/BioM3-data-share/data/weights"  # adjust for your machine
+# ColabFold (Step 5)
+conda create -n colabfold -c conda-forge -c bioconda python=3.13 kalign2=2.04 hhsuite=3.3.0 mmseqs2=18.8cc5c
+conda activate colabfold
+pip install "colabfold[alphafold,openmm]" "jax[cuda]" "openmm[cuda12]"
 
-ln -s "$SHARED_WEIGHTS/LLMs"         weights/LLMs
-ln -s "$SHARED_WEIGHTS/PenCL"        weights/PenCL
-ln -s "$SHARED_WEIGHTS/Facilitator"  weights/Facilitator
-ln -s "$SHARED_WEIGHTS/ProteoScribe" weights/ProteoScribe
+# BLAST (Step 6)
+conda create -n blast-env
+conda activate blast-env
+conda install -c bioconda blast
 ```
 
-Verify the links resolve correctly:
+TMalign (Step 7) must be compiled from source or downloaded as a binary from [https://zhanggroup.org/TM-align/](https://zhanggroup.org/TM-align/) and placed on your PATH.
+
+### 4. Weights and databases
+
+Pretrained model weights and reference databases are stored in a shared `BioM3-data-share` directory on each machine. The sync scripts create local directories with symlinks to individual files (not directory-level symlinks), which allows adding local files alongside shared ones.
+
+#### Shared data locations
+
+| Machine | Weights path | Databases path |
+|---------|-------------|---------------|
+| DGX Spark | `/data/data-share/BioM3-data-share/data/weights` | `/data/data-share/BioM3-data-share/databases` |
+| Polaris (ALCF) | `/grand/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` | `/grand/NLDesignProtein/sharepoint/BioM3-data-share/databases` |
+| Aurora (ALCF) | `/flare/NLDesignProtein/sharepoint/BioM3-data-share/data/weights` | `/flare/NLDesignProtein/sharepoint/BioM3-data-share/databases` |
+
+#### Syncing weights
 
 ```bash
-ls -l weights/
+# Preview what will be linked
+./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights --dry-run
+
+# Apply symlinks
+./scripts/sync_weights.sh /data/data-share/BioM3-data-share/data/weights weights
 ```
 
-#### Required files
+This creates the `weights/` subdirectories (LLMs, PenCL, Facilitator, ProteoScribe) and symlinks each file inside them to the shared source.
+
+#### Syncing databases (optional, for local BLAST)
+
+```bash
+# Preview
+./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases --dry-run
+
+# Apply symlinks
+./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
+```
+
+This is only needed if you plan to run local BLAST searches (Step 6 with `--db <path>`).
+
+#### Required weight files
 
 The pipeline expects the following files under `weights/`:
 
@@ -92,7 +138,7 @@ The pipeline expects the following files under `weights/`:
 | `weights/Facilitator/` | `Facilitator_MMD15.ckpt/last.ckpt` | Facilitator model (Stage 2) |
 | `weights/ProteoScribe/` | `ProteoScribe_epoch200.pth` | Pretrained ProteoScribe base model |
 
-### 4. Data
+### 5. Data
 
 Place your protein family datasets under `data/`. Each family gets its own subdirectory:
 
@@ -128,10 +174,10 @@ Process a CSV through the BioM3 embedding pipeline (PenCL → Facilitator → HD
 Example:
 
 ```bash
-./scripts/01_embedding.sh data/SH3/SH3_dataset.csv embeddings/SH3
+./scripts/01_embedding.sh data/SH3/SH3_dataset.csv outputs/SH3/embeddings
 ```
 
-This produces `embeddings/SH3/SH3_dataset.compiled_emb.hdf5`, ready for finetuning.
+This produces `outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5`, ready for finetuning.
 
 ### Step 2: Finetuning
 
@@ -145,8 +191,8 @@ Example:
 
 ```bash
 ./scripts/02_finetune.sh \
-    embeddings/SH3/SH3_dataset.compiled_emb.hdf5 \
-    finetuning/SH3 \
+    outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 \
+    outputs/SH3/finetuning \
     50
 ```
 
@@ -154,30 +200,136 @@ This loads `weights/ProteoScribe/ProteoScribe_epoch200.pth`, freezes most of the
 
 Finetuning hyperparameters are defined in `configs/config_finetune.sh`. The defaults are tuned for the DGX Spark (single GPU, bf16 precision).
 
-### Step 3: Inference
+### Step 3: Generation
 
 Generate novel protein sequences using the finetuned model:
 
 ```bash
-./scripts/03_generate.sh <model_weights> <input_csv> <embeddings_dir> <output_dir>
+./scripts/03_generate.sh <model_weights> <input_csv> <output_dir>
 ```
 
 Example:
 
 ```bash
 ./scripts/03_generate.sh \
-    finetuning/SH3/checkpoints/.../state_dict.best.pth \
+    outputs/SH3/finetuning/checkpoints/.../state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
-    embeddings/SH3 \
-    inference/SH3
+    outputs/SH3/generation
 ```
 
-This embeds the input prompts through PenCL and Facilitator (writing to `embeddings/`), then runs ProteoScribe diffusion sampling to generate sequences. Generated sequences are saved as a `.pt` file in the `inference/` directory.
+This embeds the input prompts through PenCL and Facilitator (writing to `<output_dir>/embeddings/`), then runs ProteoScribe diffusion sampling to generate sequences. Generated sequences are saved as a `.pt` file in the output directory.
+
+### Step 4: Convert to FASTA
+
+Convert the generated `.pt` file into per-prompt FASTA files:
+
+```bash
+./scripts/04_samples_to_fasta.sh <input_pt> <output_dir>
+```
+
+Example:
+
+```bash
+./scripts/04_samples_to_fasta.sh \
+    outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
+    outputs/SH3/samples
+```
+
+This produces one FASTA file per prompt plus a concatenated `generated_seqs_allprompts.fasta`. The number of prompts and replicas is detected automatically from the `.pt` file.
+
+### Step 5: Structure Prediction (ColabFold)
+
+Predict 3D structures for generated sequences using ColabFold:
+
+```bash
+conda activate colabfold
+./scripts/05_colabfold.sh <samples_dir> <output_dir> <prefix>
+```
+
+Example:
+
+```bash
+./scripts/05_colabfold.sh \
+    outputs/SH3/samples \
+    outputs/SH3/structures \
+    SH3_prompts
+```
+
+This runs `colabfold_batch` on each per-prompt FASTA file and produces PDB structures and a summary CSV with pLDDT and pTM scores.
+
+### Step 6: BLAST Search
+
+Search for homologous structures in PDB (can run in parallel with Step 5):
+
+```bash
+conda activate blast-env
+./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
+```
+
+Example (remote PDB search, default):
+
+```bash
+./scripts/06_blast_search.sh \
+    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/blast
+```
+
+Example (local NR database):
+
+```bash
+./scripts/06_blast_search.sh \
+    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/blast \
+    --db /path/to/nr --threads 16
+```
+
+By default, this runs a remote search against PDB (`pdbaa`) and downloads the top hit PDB files. Options: `--db`, `--remote`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+
+### Step 7: Structure Comparison (TMalign)
+
+Compare predicted structures against BLAST reference structures:
+
+```bash
+./scripts/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
+```
+
+Example:
+
+```bash
+./scripts/07_compare_structures.sh \
+    outputs/SH3/structures/colabfold_results.csv \
+    outputs/SH3/blast/blast_hit_results.tsv \
+    outputs/SH3/structures \
+    outputs/SH3/blast/reference_structures \
+    outputs/SH3/comparison
+```
+
+This produces `results.csv` with TM-score, RMSD, and sequence identity for each query-reference pair.
+
+### Step 8: Plot Results
+
+Generate plots from the comparison metrics:
+
+```bash
+./scripts/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
+```
+
+Example:
+
+```bash
+./scripts/08_plot_results.sh \
+    outputs/SH3/comparison/results.csv \
+    outputs/SH3/images \
+    --colabfold-csv outputs/SH3/structures/colabfold_results.csv
+```
+
+This produces strip plots for TM-score, RMSD, sequence identity, and (optionally) pLDDT.
 
 ## Repository structure
 
 ```
 BioM3-workflow-demo/
+├── run_pipeline_SH3.sh                         # Example analysis pipeline (Steps 4-8)
 ├── configs/
 │   ├── config_finetune.sh                      # Finetuning hyperparameters
 │   ├── stage1_config_PenCL_inference.json      # PenCL model config
@@ -186,11 +338,28 @@ BioM3-workflow-demo/
 ├── scripts/
 │   ├── 01_embedding.sh                         # Step 1: CSV → HDF5
 │   ├── 02_finetune.sh                          # Step 2: HDF5 → finetuned model
-│   └── 03_generate.sh                          # Step 3: prompts → sequences
+│   ├── 03_generate.sh                          # Step 3: prompts → sequences
+│   ├── 04_samples_to_fasta.sh                  # Step 4: .pt → FASTA
+│   ├── 05_colabfold.sh                         # Step 5: FASTA → predicted structures
+│   ├── 06_blast_search.sh                      # Step 6: FASTA → BLAST hits
+│   ├── 07_compare_structures.sh                # Step 7: TMalign comparison
+│   ├── 08_plot_results.sh                      # Step 8: metric plots
+│   ├── samples_to_fasta.py                     # Python helper for Step 4
+│   ├── make_plots.py                           # Python helper for Step 8
+│   ├── sync_weights.sh                         # Sync weights from shared directory
+│   └── sync_databases.sh                       # Sync databases from shared directory
 ├── data/                                       # Input datasets (per family)
-├── embeddings/                                 # Embedding outputs (per family)
-├── finetuning/                                 # Finetuning checkpoints and logs (per family)
-├── inference/                                  # Generated sequences (per family)
+│   └── databases/                              # Reference databases (optional, for local BLAST)
+├── outputs/                                    # Pipeline outputs (per family)
+│   └── <family>/
+│       ├── embeddings/                         # Step 1: embedding outputs
+│       ├── finetuning/                         # Step 2: checkpoints and logs
+│       ├── generation/                         # Step 3: generated sequences
+│       ├── samples/                            # Step 4: FASTA files
+│       ├── structures/                         # Step 5: ColabFold PDBs and results
+│       ├── blast/                              # Step 6: BLAST hits and reference PDBs
+│       ├── comparison/                         # Step 7: TMalign metrics
+│       └── images/                             # Step 8: plots
 └── weights/                                    # Pretrained model weights
 ```
 
@@ -206,7 +375,7 @@ Key parameters you may want to adjust:
 
 | Parameter | Default | Description |
 | --------- | ------- | ----------- |
-| `epochs` | 100 | Number of training epochs |
+| `epochs` | 20 | Number of training epochs |
 | `batch_size` | 32 | Training batch size |
 | `lr` | 1e-4 | Learning rate |
 | `valid_size` | 0.2 | Fraction of data used for validation |
