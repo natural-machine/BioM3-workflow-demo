@@ -259,12 +259,24 @@ This runs `colabfold_batch` on each per-prompt FASTA file and produces PDB struc
 
 ### Step 6: BLAST Search
 
-Search for homologous structures in PDB (can run in parallel with Step 5):
+Search for homologous sequences (can run in parallel with Step 5):
 
 ```bash
 conda activate blast-env
 ./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
 ```
+
+The `--db` flag accepts any known NCBI database name or a path to a local database. Known names default to remote search; paths always use local search.
+
+| Database | `--db` value | Description |
+|----------|-------------|-------------|
+| PDB | `pdbaa` (default) | Protein structures in PDB |
+| NR | `nr` | Non-redundant protein sequences |
+| SwissProt | `swissprot` | Curated UniProt sequences |
+| RefSeq Protein | `refseq_protein` | NCBI reference protein sequences |
+| Environmental NR | `env_nr` | Metagenomic protein sequences |
+| TSA NR | `tsa_nr` | Transcriptome shotgun assembly proteins |
+| Patent | `pat` | Patent protein sequences |
 
 Example (remote PDB search, default):
 
@@ -274,7 +286,16 @@ Example (remote PDB search, default):
     outputs/SH3/blast
 ```
 
-Example (local NR database):
+Example (remote SwissProt search):
+
+```bash
+./scripts/06_blast_search.sh \
+    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/blast \
+    --db swissprot
+```
+
+Example (local database by path):
 
 ```bash
 ./scripts/06_blast_search.sh \
@@ -283,7 +304,7 @@ Example (local NR database):
     --db /path/to/nr --threads 16
 ```
 
-By default, this runs a remote search against PDB (`pdbaa`) and downloads the top hit PDB files. Options: `--db`, `--remote`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). PDB file download only occurs for `pdbaa` hits. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
 
 ### Step 7: Structure Comparison (TMalign)
 

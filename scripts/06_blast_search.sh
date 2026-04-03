@@ -13,14 +13,21 @@
 #   ./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
 #
 # OPTIONS:
-#   --db <name_or_path>    BLAST database (default: pdbaa)
-#   --remote               Use NCBI remote search (default for pdbaa)
+#   --db <name_or_path>    BLAST database name or path to local copy (default: pdbaa)
+#                          Known NCBI names: pdbaa, nr, swissprot, refseq_protein,
+#                                           env_nr, tsa_nr, pat
+#                          If a path (contains /), forces local search.
+#   --remote               Use NCBI remote search (default for known db names)
+#   --local                Use local search (requires local database files)
 #   --threads N            Number of threads for local search (default: 16)
 #   --max-targets N        Max target sequences per query (default: 5)
 #   --no-download-pdbs     Skip downloading PDB files for hits
 #
 # EXAMPLE (remote PDB search, default):
 #   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast
+#
+# EXAMPLE (remote SwissProt search):
+#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db swissprot
 #
 # EXAMPLE (local NR search):
 #   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr --threads 16
@@ -40,8 +47,11 @@ if [ "$#" -lt 2 ]; then
     echo "Usage: $0 <fasta_file> <output_dir> [options]"
     echo ""
     echo "Options:"
-    echo "  --db <name_or_path>    BLAST database (default: pdbaa)"
-    echo "  --remote               Use NCBI remote search (default for pdbaa)"
+    echo "  --db <name_or_path>    BLAST database name or local path (default: pdbaa)"
+    echo "                         Known names: pdbaa, nr, swissprot, refseq_protein,"
+    echo "                                      env_nr, tsa_nr, pat"
+    echo "  --remote               Use NCBI remote search (default for known db names)"
+    echo "  --local                Use local search (requires local database files)"
     echo "  --threads N            Threads for local search (default: 16)"
     echo "  --max-targets N        Max target sequences (default: 5)"
     echo "  --no-download-pdbs     Skip downloading PDB files"
@@ -84,6 +94,10 @@ while [ "$#" -gt 0 ]; do
             remote="yes"
             shift
             ;;
+        --local)
+            remote="no"
+            shift
+            ;;
         --threads)
             threads="$2"
             shift 2
@@ -103,11 +117,27 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-# Auto-detect remote and download settings for pdbaa
-if [ "${db}" = "pdbaa" ]; then
+# Known NCBI remote database names
+known_remote_dbs="pdbaa nr swissprot refseq_protein env_nr tsa_nr pat"
+
+# Databases whose hits have PDB IDs (eligible for structure download)
+pdb_dbs="pdbaa"
+
+# Auto-detect remote and download settings
+if [[ "${db}" == */* ]]; then
+    # Path provided — always local
+    remote="${remote:-no}"
+    download_pdbs="${download_pdbs:-no}"
+elif echo " ${known_remote_dbs} " | grep -q " ${db} "; then
+    # Known NCBI database name — default to remote
     remote="${remote:-yes}"
-    download_pdbs="${download_pdbs:-yes}"
+    if echo " ${pdb_dbs} " | grep -q " ${db} "; then
+        download_pdbs="${download_pdbs:-yes}"
+    else
+        download_pdbs="${download_pdbs:-no}"
+    fi
 else
+    # Unknown name — assume local (user may have BLASTDB set)
     remote="${remote:-no}"
     download_pdbs="${download_pdbs:-no}"
 fi

@@ -59,6 +59,7 @@ config2=configs/stage2_config_Facilitator_sample.json
 config3=configs/stage3_config_ProteoScribe_sample.json
 
 prefix=$(basename "${input_csv}" .csv)
+device="${BIOM3_DEVICE:-cuda}"
 
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 
@@ -83,7 +84,8 @@ biom3_embedding_pipeline \
     --facilitator_config ${config2} \
     --prefix ${prefix} \
     --batch_size 256 \
-    --dataset_key MMD_data
+    --dataset_key MMD_data \
+    --device ${device}
 
 echo "[1/2] Done."
 echo ""
@@ -94,7 +96,8 @@ biom3_ProteoScribe_sample \
     -i ${embed_dir}/${prefix}.Facilitator_emb.pt \
     -c ${config3} \
     -m ${model_weights} \
-    -o ${outdir}/${prefix}.ProteoScribe_output.pt
+    -o ${outdir}/${prefix}.ProteoScribe_output.pt \
+    --device ${device}
 
 echo "[2/2] Done."
 echo ""

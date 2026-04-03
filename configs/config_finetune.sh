@@ -18,6 +18,7 @@ export finetune=True
 export pretrained_weights="./weights/ProteoScribe/ProteoScribe_epoch200.pth"
 export finetune_last_n_blocks=1
 export finetune_last_n_layers=1
+export finetune_output_layers=True
 
 # --- Logging (set wandb=False to disable wandb) ---
 export wandb=True
@@ -93,4 +94,3 @@ export output_hist_folder=./logs/history/Stage3_history
 export tb_logger_path=./logs/history
 export tb_logger_folder=Stage3_history
 export save_hist_path=None
-export traindata_len=None

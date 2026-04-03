@@ -6,9 +6,12 @@ This walkthrough demonstrates the full BioM3 workflow for the **CM** (Chorismate
 
 | | |
 | --- | --- |
-| **File** | `data/CM/FINAL_CM_all_dataset_with_prompts.csv` |
+| **Training data** | `data/CM/FINAL_CM_all_dataset_with_prompts.csv` |
 | **Rows** | 8,319 |
+| **Prompts** | `data/CM/CM_prompts.csv` (prompts for generation) |
 | **Columns** | `primary_Accession`, `protein_sequence`, `[final]text_caption`, `pfam_label` |
+
+> **Note:** `CM_prompts.csv` must be created with a small set of representative prompts, similar to `data/SH3/SH3_prompts.csv`.
 
 ## Setup
 
@@ -42,6 +45,8 @@ outputs/CM/embeddings/
     FINAL_CM_all_dataset_with_prompts.PenCL_emb.pt           # Stage 1 embeddings (z_t, z_p)
     FINAL_CM_all_dataset_with_prompts.Facilitator_emb.pt     # Stage 2 embeddings (z_t, z_p, z_c)
     FINAL_CM_all_dataset_with_prompts.compiled_emb.hdf5      # Compiled training data
+    build_manifest.json                                       # Reproducibility metadata
+    run.log                                                   # Pipeline log
 ```
 
 ## Step 2: Finetuning
@@ -76,6 +81,7 @@ outputs/CM/finetuning/
                 last.ckpt                         # Latest checkpoint
                 epoch=XX-step=XXXXX.ckpt          # Best checkpoint(s)
                 state_dict.best.pth               # Best weights (raw state dict)
+                build_manifest.json               # Training metadata and parameters
 ```
 
 ## Step 3: Sequence Generation
@@ -85,7 +91,7 @@ Generate novel CM protein sequences using the finetuned model. The input CSV sho
 ```bash
 ./scripts/03_generate.sh \
     outputs/CM/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
-    data/CM/FINAL_CM_all_dataset_with_prompts.csv \
+    data/CM/CM_prompts.csv \
     outputs/CM/generation
 ```
 
@@ -101,10 +107,14 @@ Generate novel CM protein sequences using the finetuned model. The input CSV sho
 ```
 outputs/CM/generation/
     embeddings/
-        FINAL_CM_all_dataset_with_prompts.PenCL_emb.pt
-        FINAL_CM_all_dataset_with_prompts.Facilitator_emb.pt
-        FINAL_CM_all_dataset_with_prompts.compiled_emb.hdf5
-    FINAL_CM_all_dataset_with_prompts.ProteoScribe_output.pt   # Generated sequences
+        CM_prompts.PenCL_emb.pt
+        CM_prompts.Facilitator_emb.pt
+        CM_prompts.compiled_emb.hdf5
+        build_manifest.json              # Embedding pipeline metadata
+        run.log
+    CM_prompts.ProteoScribe_output.pt   # Generated sequences
+    build_manifest.json                  # Generation metadata
+    run.log
 ```
 
 ## Steps 4-8: Analysis Pipeline
@@ -115,7 +125,7 @@ After generation, run the analysis pipeline. Copy `run_pipeline_SH3.sh`, update 
 
 ```bash
 ./scripts/04_samples_to_fasta.sh \
-    outputs/CM/generation/FINAL_CM_all_dataset_with_prompts.ProteoScribe_output.pt \
+    outputs/CM/generation/CM_prompts.ProteoScribe_output.pt \
     outputs/CM/samples
 ```
 
@@ -126,7 +136,7 @@ conda activate colabfold
 ./scripts/05_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures \
-    FINAL_CM_all_dataset_with_prompts
+    CM_prompts
 ```
 
 ### Step 6: BLAST Search
@@ -137,6 +147,8 @@ conda activate blast-env
     outputs/CM/samples/generated_seqs_allprompts.fasta \
     outputs/CM/blast
 ```
+
+Defaults to a remote `pdbaa` search. Use `--db <name>` for other databases (e.g. `--db swissprot`, `--db nr`) or `--db /path/to/db` for a local copy.
 
 ### Step 7: Structure Comparison (TMalign)
 
@@ -178,12 +190,12 @@ conda activate biom3-env
 # 3. Generation (update the checkpoint path from your finetuning output)
 ./scripts/03_generate.sh \
     outputs/CM/finetuning/checkpoints/lightning_logs/<version_name>/state_dict.best.pth \
-    data/CM/FINAL_CM_all_dataset_with_prompts.csv \
+    data/CM/CM_prompts.csv \
     outputs/CM/generation
 
 # 4. FASTA conversion
 ./scripts/04_samples_to_fasta.sh \
-    outputs/CM/generation/FINAL_CM_all_dataset_with_prompts.ProteoScribe_output.pt \
+    outputs/CM/generation/CM_prompts.ProteoScribe_output.pt \
     outputs/CM/samples
 
 # 5. ColabFold (requires colabfold env)
@@ -191,7 +203,7 @@ conda activate colabfold
 ./scripts/05_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures \
-    FINAL_CM_all_dataset_with_prompts
+    CM_prompts
 
 # 6. BLAST (requires blast-env)
 conda activate blast-env

@@ -146,6 +146,20 @@ biom3_pretrain_stage3 \
     --pretrained_weights ${pretrained_weights} \
     --finetune_last_n_blocks ${finetune_last_n_blocks} \
     --finetune_last_n_layers ${finetune_last_n_layers} \
+    --finetune_output_layers ${finetune_output_layers} \
+    --wandb_logging_dir ${wandb_logging_dir} \
+    --wandb_tags ${wandb_tags} \
+    --ema_power ${ema_power} \
+    --num_steps ${num_steps} \
+    --actnorm ${actnorm} \
+    --perm_channel ${perm_channel} \
+    --perm_length ${perm_length} \
+    --input_dp_rate ${input_dp_rate} \
+    --transformer_blocks ${transformer_blocks} \
+    --transformer_dropout ${transformer_dropout} \
+    --transformer_reversible ${transformer_reversible} \
+    --transformer_local_heads ${transformer_local_heads} \
+    --transformer_local_size ${transformer_local_size} \
 2>&1 | tee ${log_fpath}
 
 echo ""

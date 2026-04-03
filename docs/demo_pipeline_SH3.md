@@ -43,6 +43,8 @@ outputs/SH3/embeddings/
     FINAL_SH3_all_dataset_with_prompts.PenCL_emb.pt           # Stage 1 embeddings (z_t, z_p)
     FINAL_SH3_all_dataset_with_prompts.Facilitator_emb.pt     # Stage 2 embeddings (z_t, z_p, z_c)
     FINAL_SH3_all_dataset_with_prompts.compiled_emb.hdf5      # Compiled training data
+    build_manifest.json                                        # Reproducibility metadata
+    run.log                                                    # Pipeline log
 ```
 
 ## Step 2: Finetuning
@@ -77,6 +79,7 @@ outputs/SH3/finetuning/
                 last.ckpt                         # Latest checkpoint
                 epoch=XX-step=XXXXX.ckpt          # Best checkpoint(s)
                 state_dict.best.pth               # Best weights (raw state dict)
+                build_manifest.json               # Training metadata and parameters
 ```
 
 ## Step 3: Sequence Generation
@@ -105,7 +108,11 @@ outputs/SH3/generation/
         SH3_prompts.PenCL_emb.pt
         SH3_prompts.Facilitator_emb.pt
         SH3_prompts.compiled_emb.hdf5
+        build_manifest.json               # Embedding pipeline metadata
+        run.log
     SH3_prompts.ProteoScribe_output.pt   # Generated sequences
+    build_manifest.json                   # Generation metadata
+    run.log
 ```
 
 ### Using pretrained SH3 weights
@@ -160,7 +167,7 @@ conda activate blast-env
     outputs/SH3/blast
 ```
 
-Searches PDB for homologous structures and downloads top hit PDB files. Can run in parallel with Step 5.
+Searches for homologous sequences and (for `pdbaa`) downloads top hit PDB files. Can run in parallel with Step 5. Defaults to a remote `pdbaa` search; use `--db <name>` for other databases (e.g. `--db swissprot`, `--db nr`) or `--db /path/to/db` for a local copy. Use `--local` to force a local search by name.
 
 ### Step 7: Structure Comparison (TMalign)
 
