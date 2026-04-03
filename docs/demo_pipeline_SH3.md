@@ -20,6 +20,41 @@ conda activate biom3-env
 cd /path/to/BioM3-workflow-demo
 ```
 
+## Configuration
+
+The pipeline is driven by JSON and shell config files in `configs/`. Each script reads its config automatically — you only need to edit these if you want to change model parameters or hardware settings.
+
+| Config file | Used by | Purpose |
+| --- | --- | --- |
+| `configs/stage1_config_PenCL_inference.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | PenCL inference: ESM-2 + BiomedBERT encoding into shared 512-dim space |
+| `configs/stage2_config_Facilitator_sample.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | Facilitator sampling: MMD alignment of text → protein embedding distribution |
+| `configs/config_finetune.sh` | Step 2 (`02_finetune.sh`) | Finetuning hyperparameters, optimizer settings, hardware config, and W&B logging |
+| `configs/stage3_config_ProteoScribe_sample.json` | Step 3 (`03_generate.sh`) | ProteoScribe diffusion sampling parameters for sequence generation |
+
+### Key parameters you may want to adjust
+
+**`stage1_config_PenCL_inference.json`** — Embedding (PenCL):
+- `batch_size` (default 80): reduce if you hit GPU OOM during embedding
+- `num_workers` (default 12): dataloader workers; match to available CPU cores
+
+**`stage2_config_Facilitator_sample.json`** — Embedding (Facilitator):
+- `batch_size` (default 64): reduce if you hit GPU OOM during facilitator sampling
+
+**`config_finetune.sh`** — Finetuning:
+- `epochs` (default 20): number of training epochs (can also be overridden via the CLI arg to `02_finetune.sh`)
+- `lr` (default 1e-4): learning rate
+- `batch_size` (default 32): training batch size
+- `precision` (default bf16): set to `fp32` or `16` depending on GPU support
+- `finetune_last_n_blocks` / `finetune_last_n_layers` (default 1): how many transformer blocks/layers to unfreeze
+- `wandb` (default True): set to `False` to disable W&B logging
+
+**`stage3_config_ProteoScribe_sample.json`** — Generation:
+- `num_replicas` (default 5): number of sequences generated per prompt
+- `batch_size_sample` (default 32): sampling batch size
+- `diffusion_steps` (default 1024): number of diffusion steps; more steps = higher quality but slower
+
+Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the config files and are overridden by the scripts at execution time — you do not need to edit those fields.
+
 ## Step 1: Embedding
 
 Process the SH3 dataset through PenCL (Stage 1) and Facilitator (Stage 2), then compile the output into an HDF5 file for finetuning.
@@ -167,7 +202,7 @@ conda activate blast-env
     outputs/SH3/blast
 ```
 
-Searches for homologous sequences and (for `pdbaa`) downloads top hit PDB files. Can run in parallel with Step 5. Defaults to a remote `pdbaa` search; use `--db <name>` for other databases (e.g. `--db swissprot`, `--db nr`) or `--db /path/to/db` for a local copy. Use `--local` to force a local search by name.
+Defaults to a remote SwissProt search. Can run in parallel with Step 5. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or `--db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot` for a local SwissProt search. Use `--local` to force a local search by name.
 
 ### Step 7: Structure Comparison (TMalign)
 

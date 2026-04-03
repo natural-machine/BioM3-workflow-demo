@@ -3,9 +3,9 @@
 # Step 6: BLAST Homology Search
 #
 # Runs a BLAST protein search (blastp) on generated sequences to find
-# homologous structures in PDB or other databases. By default, performs a
-# remote search against the PDB (pdbaa) and downloads top hit PDB files.
-# Can also run local searches against databases like NR.
+# homologous sequences in SwissProt, PDB, NR, or other databases. By default,
+# performs a remote search against SwissProt. Use --db pdbaa for a PDB search
+# with automatic reference structure downloads.
 #
 # Requires the `blast-env` conda environment to be active.
 #
@@ -13,7 +13,7 @@
 #   ./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
 #
 # OPTIONS:
-#   --db <name_or_path>    BLAST database name or path to local copy (default: pdbaa)
+#   --db <name_or_path>    BLAST database name or path to local copy (default: swissprot)
 #                          Known NCBI names: pdbaa, nr, swissprot, refseq_protein,
 #                                           env_nr, tsa_nr, pat
 #                          If a path (contains /), forces local search.
@@ -23,14 +23,15 @@
 #   --max-targets N        Max target sequences per query (default: 5)
 #   --no-download-pdbs     Skip downloading PDB files for hits
 #
-# EXAMPLE (remote PDB search, default):
+# EXAMPLE (remote SwissProt search, default):
 #   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast
 #
-# EXAMPLE (remote SwissProt search):
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db swissprot
+# EXAMPLE (remote PDB search with structure downloads):
+#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db pdbaa
 #
-# EXAMPLE (local NR search):
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr --threads 16
+# EXAMPLE (local SwissProt or NR search):
+#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/swissprot_blast/swissprot --threads 16
+#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr_blast/nr --threads 16
 #
 # INPUT:
 #   <fasta_file>: concatenated FASTA of generated sequences from Step 4
@@ -47,7 +48,7 @@ if [ "$#" -lt 2 ]; then
     echo "Usage: $0 <fasta_file> <output_dir> [options]"
     echo ""
     echo "Options:"
-    echo "  --db <name_or_path>    BLAST database name or local path (default: pdbaa)"
+    echo "  --db <name_or_path>    BLAST database name or local path (default: swissprot)"
     echo "                         Known names: pdbaa, nr, swissprot, refseq_protein,"
     echo "                                      env_nr, tsa_nr, pat"
     echo "  --remote               Use NCBI remote search (default for known db names)"
@@ -78,7 +79,7 @@ if ! command -v blastp &> /dev/null; then
 fi
 
 # --- Parse optional flags ---
-db="pdbaa"
+db="swissprot"
 remote=""
 threads=16
 max_targets=5

@@ -270,15 +270,15 @@ The `--db` flag accepts any known NCBI database name or a path to a local databa
 
 | Database | `--db` value | Description |
 |----------|-------------|-------------|
-| PDB | `pdbaa` (default) | Protein structures in PDB |
+| SwissProt | `swissprot` (default) | Curated UniProt sequences |
+| PDB | `pdbaa` | Protein structures in PDB (enables PDB file download) |
 | NR | `nr` | Non-redundant protein sequences |
-| SwissProt | `swissprot` | Curated UniProt sequences |
 | RefSeq Protein | `refseq_protein` | NCBI reference protein sequences |
 | Environmental NR | `env_nr` | Metagenomic protein sequences |
 | TSA NR | `tsa_nr` | Transcriptome shotgun assembly proteins |
 | Patent | `pat` | Patent protein sequences |
 
-Example (remote PDB search, default):
+Example (remote SwissProt search, default):
 
 ```bash
 ./scripts/06_blast_search.sh \
@@ -286,25 +286,30 @@ Example (remote PDB search, default):
     outputs/SH3/blast
 ```
 
-Example (remote SwissProt search):
+Example (remote PDB search with structure downloads):
 
 ```bash
 ./scripts/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast \
-    --db swissprot
+    --db pdbaa
 ```
 
-Example (local database by path):
+Example (local SwissProt or NR search):
 
 ```bash
 ./scripts/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast \
-    --db /path/to/nr --threads 16
+    --db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot --threads 16
+
+./scripts/06_blast_search.sh \
+    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/blast \
+    --db /path/to/BioM3-data-share/databases/nr_blast/nr --threads 16
 ```
 
-By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). PDB file download only occurs for `pdbaa` hits. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). Local copies of SwissProt and NR are available under `BioM3-data-share/databases/` (`swissprot_blast/` and `nr_blast/`). PDB file download only occurs for `pdbaa` hits. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
 
 ### Step 7: Structure Comparison (TMalign)
 
