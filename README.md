@@ -2,6 +2,19 @@
 
 A demonstration of the [BioM3 framework](https://openreview.net/forum?id=L1MyyRCAjX) (NeurIPS 2024) finetuning and sequence generation workflow. This repo shows how to take a pretrained ProteoScribe model and finetune it on a protein family dataset, generate novel protein sequences guided by natural language prompts, and evaluate the results with structure prediction and homology search.
 
+## BioM3 Ecosystem
+
+This demo is part of a multi-repo ecosystem:
+
+| Repository | Role | Description |
+|------------|------|-------------|
+| [BioM3-dev](https://github.com/addison-nm/BioM3-dev) | Core library | Python package: 3-stage pipeline, dataset construction, training |
+| [BioM3-data-share](https://github.com/natural-machine/BioM3-data-share) | Shared data | Model weights, datasets, and reference databases synced across clusters |
+| **BioM3-workflow-demo** (this repo) | Demo workflows | End-to-end finetuning and generation demonstration pipeline |
+| BioM3-workspace-template | Workspace setup | *(Planned)* Standardized workspace template for new research projects |
+
+See [docs/biom3_ecosystem.md](./docs/biom3_ecosystem.md) for cross-repo workflows, version compatibility, and shared data architecture.
+
 ## Overview
 
 The workflow consists of eight steps:
