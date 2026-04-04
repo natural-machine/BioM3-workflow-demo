@@ -7,11 +7,11 @@
 # is detected automatically from the .pt file contents.
 #
 # USAGE:
-#   ./scripts/04_samples_to_fasta.sh <input_pt> <output_dir>
+#   ./pipeline/04_samples_to_fasta.sh <input_pt> <output_dir>
 #
 # EXAMPLE:
-#   ./scripts/04_samples_to_fasta.sh outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt outputs/SH3/samples
-#   ./scripts/04_samples_to_fasta.sh outputs/CM/generation/CM_prompts.ProteoScribe_output.pt outputs/CM/samples
+#   ./pipeline/04_samples_to_fasta.sh outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt outputs/SH3/samples
+#   ./pipeline/04_samples_to_fasta.sh outputs/CM/generation/CM_prompts.ProteoScribe_output.pt outputs/CM/samples
 #
 # INPUT:
 #   <input_pt>: .pt file from Step 3 (ProteoScribe generation output)

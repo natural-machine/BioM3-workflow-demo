@@ -54,6 +54,8 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 - `num_replicas` (default 5): number of sequences generated per prompt
 - `batch_size_sample` (default 32): sampling batch size
 - `diffusion_steps` (default 1024): number of diffusion steps; more steps = higher quality but slower
+- `unmasking_order` (default `random`): position unmasking order; `random` or `confidence` (most-confident first)
+- `token_strategy` (default `sample`): token selection; `sample` (stochastic, Gumbel-max) or `argmax` (deterministic)
 
 Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the config files and are overridden by the scripts at execution time — you do not need to edit those fields.
 
@@ -62,7 +64,7 @@ Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the 
 Process the CM dataset through PenCL (Stage 1) and Facilitator (Stage 2), then compile the output into an HDF5 file for finetuning.
 
 ```bash
-./scripts/01_embedding.sh \
+./pipeline/01_embedding.sh \
     data/CM/FINAL_CM_all_dataset_with_prompts.csv \
     outputs/CM/embeddings
 ```
@@ -89,7 +91,7 @@ outputs/CM/embeddings/
 Finetune the pretrained ProteoScribe base model (`ProteoScribe_epoch200.pth`) on the CM embedded dataset.
 
 ```bash
-./scripts/02_finetune.sh \
+./pipeline/02_finetune.sh \
     outputs/CM/embeddings/FINAL_CM_all_dataset_with_prompts.compiled_emb.hdf5 \
     outputs/CM/finetuning \
     50
@@ -124,7 +126,7 @@ outputs/CM/finetuning/
 Generate novel CM protein sequences using the finetuned model. The input CSV should contain the text prompts you want to condition generation on (same format as the training data).
 
 ```bash
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     outputs/CM/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
     data/CM/CM_prompts.csv \
     outputs/CM/generation
@@ -137,6 +139,30 @@ Generate novel CM protein sequences using the finetuned model. The input CSV sho
 1. **Embedding** — Runs the input CSV through PenCL and Facilitator, writing embeddings to `<output_dir>/embeddings/`
 2. **ProteoScribe sampling** — Runs conditional diffusion sampling to generate protein sequences from the facilitated embeddings
 
+#### Sampling options and animation
+
+To use deterministic generation with confidence-based unmasking:
+
+```bash
+./pipeline/03_generate.sh \
+    outputs/CM/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
+    data/CM/CM_prompts.csv \
+    outputs/CM/generation \
+    --token_strategy argmax --unmasking_order confidence
+```
+
+To generate GIF animations of the denoising process for all prompts:
+
+```bash
+./pipeline/03_generate.sh \
+    outputs/CM/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
+    data/CM/CM_prompts.csv \
+    outputs/CM/generation \
+    --animate_prompts all --animate_replicas 10
+```
+
+GIFs are saved to `outputs/CM/generation/animations/` by default. See `--animate_prompts`, `--animate_replicas`, and `--animation_dir` in the main README for full details.
+
 ### Expected outputs
 
 ```
@@ -148,18 +174,27 @@ outputs/CM/generation/
         build_manifest.json              # Embedding pipeline metadata
         run.log
     CM_prompts.ProteoScribe_output.pt   # Generated sequences
+    animations/                          # GIF animations (if --animate_prompts used)
+        prompt_0_replica_0.gif
+        ...
     build_manifest.json                  # Generation metadata
     run.log
 ```
 
 ## Steps 4-8: Analysis Pipeline
 
-After generation, run the analysis pipeline. Copy `run_pipeline_SH3.sh`, update the `PT_FILE` and `OUTDIR` variables for CM, and run it. Or run each step individually:
+After generation, run the analysis pipeline:
+
+```bash
+python run_pipeline.py configs/pipeline_CM.toml --steps 4 5 6 6b 7 8
+```
+
+Or run each step individually:
 
 ### Step 4: Convert to FASTA
 
 ```bash
-./scripts/04_samples_to_fasta.sh \
+./pipeline/04_samples_to_fasta.sh \
     outputs/CM/generation/CM_prompts.ProteoScribe_output.pt \
     outputs/CM/samples
 ```
@@ -168,7 +203,7 @@ After generation, run the analysis pipeline. Copy `run_pipeline_SH3.sh`, update 
 
 ```bash
 conda activate colabfold
-./scripts/05_colabfold.sh \
+./pipeline/05_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures \
     CM_prompts
@@ -178,17 +213,29 @@ conda activate colabfold
 
 ```bash
 conda activate blast-env
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/CM/samples/generated_seqs_allprompts.fasta \
     outputs/CM/blast
 ```
 
 Defaults to a remote SwissProt search. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or pass a local path (e.g. `--db /path/to/BioM3-data-share/databases/nr_blast/nr`) for a local search.
 
+### Step 6b: Fetch Reference Structures
+
+For non-pdbaa databases (SwissProt, NR, etc.), fetch 3D structures for BLAST hits. Downloads experimental structures from RCSB when available, falling back to AlphaFold DB predictions.
+
+```bash
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/CM/blast/blast_hit_results.tsv \
+    outputs/CM/blast
+```
+
+Outputs `reference_structures/` (PDB files named by UniProt accession) and `structure_manifest.tsv` (source metadata per accession).
+
 ### Step 7: Structure Comparison (TMalign)
 
 ```bash
-./scripts/07_compare_structures.sh \
+./pipeline/07_compare_structures.sh \
     outputs/CM/structures/colabfold_results.csv \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/structures \
@@ -199,7 +246,7 @@ Defaults to a remote SwissProt search. Use `--db pdbaa` for a PDB search (also d
 ### Step 8: Plot Results
 
 ```bash
-./scripts/08_plot_results.sh \
+./pipeline/08_plot_results.sh \
     outputs/CM/comparison/results.csv \
     outputs/CM/images \
     --colabfold-csv outputs/CM/structures/colabfold_results.csv
@@ -212,42 +259,47 @@ Defaults to a remote SwissProt search. Use `--db pdbaa` for a PDB search (also d
 conda activate biom3-env
 
 # 1. Embedding
-./scripts/01_embedding.sh \
+./pipeline/01_embedding.sh \
     data/CM/FINAL_CM_all_dataset_with_prompts.csv \
     outputs/CM/embeddings
 
 # 2. Finetuning (50 epochs)
-./scripts/02_finetune.sh \
+./pipeline/02_finetune.sh \
     outputs/CM/embeddings/FINAL_CM_all_dataset_with_prompts.compiled_emb.hdf5 \
     outputs/CM/finetuning \
     50
 
 # 3. Generation (update the checkpoint path from your finetuning output)
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     outputs/CM/finetuning/checkpoints/lightning_logs/<version_name>/state_dict.best.pth \
     data/CM/CM_prompts.csv \
     outputs/CM/generation
 
 # 4. FASTA conversion
-./scripts/04_samples_to_fasta.sh \
+./pipeline/04_samples_to_fasta.sh \
     outputs/CM/generation/CM_prompts.ProteoScribe_output.pt \
     outputs/CM/samples
 
 # 5. ColabFold (requires colabfold env)
 conda activate colabfold
-./scripts/05_colabfold.sh \
+./pipeline/05_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures \
     CM_prompts
 
 # 6. BLAST (requires blast-env)
 conda activate blast-env
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/CM/samples/generated_seqs_allprompts.fasta \
     outputs/CM/blast
 
+# 6b. Fetch reference structures (for SwissProt/non-pdbaa hits)
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/CM/blast/blast_hit_results.tsv \
+    outputs/CM/blast
+
 # 7. TMalign comparison
-./scripts/07_compare_structures.sh \
+./pipeline/07_compare_structures.sh \
     outputs/CM/structures/colabfold_results.csv \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/structures \
@@ -255,7 +307,7 @@ conda activate blast-env
     outputs/CM/comparison
 
 # 8. Plotting
-./scripts/08_plot_results.sh \
+./pipeline/08_plot_results.sh \
     outputs/CM/comparison/results.csv \
     outputs/CM/images \
     --colabfold-csv outputs/CM/structures/colabfold_results.csv

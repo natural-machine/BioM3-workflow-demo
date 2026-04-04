@@ -52,6 +52,8 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 - `num_replicas` (default 5): number of sequences generated per prompt
 - `batch_size_sample` (default 32): sampling batch size
 - `diffusion_steps` (default 1024): number of diffusion steps; more steps = higher quality but slower
+- `unmasking_order` (default `random`): position unmasking order; `random` or `confidence` (most-confident first)
+- `token_strategy` (default `sample`): token selection; `sample` (stochastic, Gumbel-max) or `argmax` (deterministic)
 
 Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the config files and are overridden by the scripts at execution time — you do not need to edit those fields.
 
@@ -60,7 +62,7 @@ Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the 
 Process the SH3 dataset through PenCL (Stage 1) and Facilitator (Stage 2), then compile the output into an HDF5 file for finetuning.
 
 ```bash
-./scripts/01_embedding.sh \
+./pipeline/01_embedding.sh \
     data/SH3/FINAL_SH3_all_dataset_with_prompts.csv \
     outputs/SH3/embeddings
 ```
@@ -87,7 +89,7 @@ outputs/SH3/embeddings/
 Finetune the pretrained ProteoScribe base model (`ProteoScribe_epoch200.pth`) on the SH3 embedded dataset.
 
 ```bash
-./scripts/02_finetune.sh \
+./pipeline/02_finetune.sh \
     outputs/SH3/embeddings/FINAL_SH3_all_dataset_with_prompts.compiled_emb.hdf5 \
     outputs/SH3/finetuning \
     50
@@ -122,7 +124,7 @@ outputs/SH3/finetuning/
 Generate novel SH3 protein sequences using the finetuned model. The input CSV should contain the text prompts you want to condition generation on (same format as the training data).
 
 ```bash
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     outputs/SH3/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
@@ -135,6 +137,30 @@ Generate novel SH3 protein sequences using the finetuned model. The input CSV sh
 1. **Embedding** — Runs the input CSV through PenCL and Facilitator, writing embeddings to `<output_dir>/embeddings/`
 2. **ProteoScribe sampling** — Runs conditional diffusion sampling to generate protein sequences from the facilitated embeddings
 
+#### Sampling options and animation
+
+To use deterministic generation (argmax) with confidence-based unmasking:
+
+```bash
+./pipeline/03_generate.sh \
+    outputs/SH3/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
+    data/SH3/SH3_prompts.csv \
+    outputs/SH3/generation \
+    --token_strategy argmax --unmasking_order confidence
+```
+
+To generate GIF animations of the denoising process for all prompts:
+
+```bash
+./pipeline/03_generate.sh \
+    weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt \
+    data/SH3/SH3_prompts.csv \
+    outputs/SH3/generation \
+    --animate_prompts all --animate_replicas 10
+```
+
+GIFs are saved to `outputs/SH3/generation/animations/` by default. See `--animate_prompts`, `--animate_replicas`, and `--animation_dir` in the main README for full details.
+
 ### Expected outputs
 
 ```
@@ -146,6 +172,9 @@ outputs/SH3/generation/
         build_manifest.json               # Embedding pipeline metadata
         run.log
     SH3_prompts.ProteoScribe_output.pt   # Generated sequences
+    animations/                           # GIF animations (if --animate_prompts used)
+        prompt_0_replica_0.gif
+        ...
     build_manifest.json                   # Generation metadata
     run.log
 ```
@@ -155,7 +184,7 @@ outputs/SH3/generation/
 If you want to skip finetuning and generate sequences directly, pretrained SH3 weights are available in the shared weights directory:
 
 ```bash
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt/single_model.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
@@ -163,18 +192,18 @@ If you want to skip finetuning and generate sequences directly, pretrained SH3 w
 
 ## Steps 4-8: Analysis Pipeline
 
-After generation, run the analysis pipeline to predict structures, search for homologs, and evaluate results. An example script is provided at the repo root:
+After generation, run the analysis pipeline to predict structures, search for homologs, and evaluate results:
 
 ```bash
-./run_pipeline_SH3.sh
+python run_pipeline.py configs/pipeline_SH3_analysis.toml
 ```
 
-This runs Steps 4 through 8 in sequence. Edit the variables at the top of the script to point to your `.pt` file and desired output directories. You can also run each step individually:
+This runs Steps 4 through 8 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
 
 ### Step 4: Convert to FASTA
 
 ```bash
-./scripts/04_samples_to_fasta.sh \
+./pipeline/04_samples_to_fasta.sh \
     outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
     outputs/SH3/samples
 ```
@@ -185,7 +214,7 @@ Produces per-prompt FASTA files and a concatenated `generated_seqs_allprompts.fa
 
 ```bash
 conda activate colabfold
-./scripts/05_colabfold.sh \
+./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures \
     SH3_prompts
@@ -197,17 +226,29 @@ Runs ColabFold on each per-prompt FASTA and produces `colabfold_results.csv` wit
 
 ```bash
 conda activate blast-env
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast
 ```
 
 Defaults to a remote SwissProt search. Can run in parallel with Step 5. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or `--db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot` for a local SwissProt search. Use `--local` to force a local search by name.
 
+### Step 6b: Fetch Reference Structures
+
+For non-pdbaa databases (SwissProt, NR, etc.), fetch 3D structures for BLAST hits. Downloads experimental structures from RCSB when available, falling back to AlphaFold DB predictions. If `../BioM3-data-share/databases/swissprot/uniprot_sprot.dat.gz` is present, PDB cross-references are resolved locally (no API calls needed for the lookup step).
+
+```bash
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/SH3/blast/blast_hit_results.tsv \
+    outputs/SH3/blast
+```
+
+Outputs `reference_structures/` (PDB files named by UniProt accession) and `structure_manifest.tsv` (source metadata per accession).
+
 ### Step 7: Structure Comparison (TMalign)
 
 ```bash
-./scripts/07_compare_structures.sh \
+./pipeline/07_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
@@ -220,7 +261,7 @@ Compares predicted structures against BLAST reference structures using TMalign.
 ### Step 8: Plot Results
 
 ```bash
-./scripts/08_plot_results.sh \
+./pipeline/08_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
@@ -235,43 +276,48 @@ Generates strip plots for TM-score, RMSD, sequence identity, and pLDDT.
 conda activate biom3-env
 
 # 1. Embedding
-./scripts/01_embedding.sh \
+./pipeline/01_embedding.sh \
     data/SH3/FINAL_SH3_all_dataset_with_prompts.csv \
     outputs/SH3/embeddings
 
 # 2. Finetuning (50 epochs)
-./scripts/02_finetune.sh \
+./pipeline/02_finetune.sh \
     outputs/SH3/embeddings/FINAL_SH3_all_dataset_with_prompts.compiled_emb.hdf5 \
     outputs/SH3/finetuning \
     50
 
 # 3. Generation (update the checkpoint path from your finetuning output)
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     outputs/SH3/finetuning/checkpoints/lightning_logs/<version_name>/state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
 
-# Steps 4-8: analysis (or use run_pipeline_SH3.sh)
+# Steps 4-8: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
 # 4. FASTA conversion
-./scripts/04_samples_to_fasta.sh \
+./pipeline/04_samples_to_fasta.sh \
     outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
     outputs/SH3/samples
 
 # 5. ColabFold (requires colabfold env)
 conda activate colabfold
-./scripts/05_colabfold.sh \
+./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures \
     SH3_prompts
 
 # 6. BLAST (requires blast-env)
 conda activate blast-env
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast
 
+# 6b. Fetch reference structures (for SwissProt/non-pdbaa hits)
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/SH3/blast/blast_hit_results.tsv \
+    outputs/SH3/blast
+
 # 7. TMalign comparison
-./scripts/07_compare_structures.sh \
+./pipeline/07_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
@@ -279,7 +325,7 @@ conda activate blast-env
     outputs/SH3/comparison
 
 # 8. Plotting
-./scripts/08_plot_results.sh \
+./pipeline/08_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv

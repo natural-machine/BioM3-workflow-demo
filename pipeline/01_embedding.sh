@@ -9,11 +9,11 @@
 #   3. HDF5 compilation — packages embeddings for Stage 3 finetuning
 #
 # USAGE:
-#   ./scripts/01_embedding.sh <input_csv> <output_dir>
+#   ./pipeline/01_embedding.sh <input_csv> <output_dir>
 #
 # EXAMPLE:
-#   ./scripts/01_embedding.sh data/SH3/SH3_dataset.csv outputs/SH3/embeddings
-#   ./scripts/01_embedding.sh data/CM/CM_dataset.csv outputs/CM/embeddings
+#   ./pipeline/01_embedding.sh data/SH3/SH3_dataset.csv outputs/SH3/embeddings
+#   ./pipeline/01_embedding.sh data/CM/CM_dataset.csv outputs/CM/embeddings
 #
 # INPUT:
 #   A CSV file with at minimum these columns:

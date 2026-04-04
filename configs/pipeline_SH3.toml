@@ -1,0 +1,26 @@
+# Pipeline configuration for SH3 protein family (full pipeline)
+# Run: python run_pipeline.py configs/pipeline_SH3.toml
+
+[pipeline]
+steps = [1, 2, 3, 4, 5, 6, "6b", 7, 8]
+
+[environments]
+biom3     = "biom3-env"       # Steps 1-4, 7-8
+colabfold = "colabfold"       # Step 5
+blast     = "blast-env"       # Step 6
+
+[paths]
+output_dir  = "outputs/SH3"
+input_csv   = "data/SH3/FINAL_SH3_all_dataset_with_prompts.csv"
+prompts_csv = "data/SH3/SH3_prompts.csv"
+epochs      = 50
+# model_weights = "outputs/SH3/finetuning/checkpoints/.../state_dict.best.pth"
+# pt_file       = "outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt"
+
+[blast]
+db      = "swissprot"
+threads = 16
+
+# [generation]
+# unmasking_order = "confidence"
+# token_strategy  = "argmax"

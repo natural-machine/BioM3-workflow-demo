@@ -7,10 +7,10 @@
 # from ColabFold results (Step 5).
 #
 # USAGE:
-#   ./scripts/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
+#   ./pipeline/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
 #
 # EXAMPLE:
-#   ./scripts/08_plot_results.sh \
+#   ./pipeline/08_plot_results.sh \
 #       outputs/SH3/comparison/results.csv \
 #       outputs/SH3/images \
 #       --colabfold-csv outputs/SH3/structures/colabfold_results.csv

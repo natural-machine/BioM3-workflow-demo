@@ -9,10 +9,10 @@
 # Requires TMalign to be installed and on PATH.
 #
 # USAGE:
-#   ./scripts/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
+#   ./pipeline/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
 #
 # EXAMPLE:
-#   ./scripts/07_compare_structures.sh \
+#   ./pipeline/07_compare_structures.sh \
 #       outputs/SH3/structures/colabfold_results.csv \
 #       outputs/SH3/blast/blast_hit_results.tsv \
 #       outputs/SH3/structures \

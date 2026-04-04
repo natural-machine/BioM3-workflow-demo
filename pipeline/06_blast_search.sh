@@ -10,7 +10,7 @@
 # Requires the `blast-env` conda environment to be active.
 #
 # USAGE:
-#   ./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
+#   ./pipeline/06_blast_search.sh <fasta_file> <output_dir> [options]
 #
 # OPTIONS:
 #   --db <name_or_path>    BLAST database name or path to local copy (default: swissprot)
@@ -24,14 +24,14 @@
 #   --no-download-pdbs     Skip downloading PDB files for hits
 #
 # EXAMPLE (remote SwissProt search, default):
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast
 #
 # EXAMPLE (remote PDB search with structure downloads):
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db pdbaa
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db pdbaa
 #
 # EXAMPLE (local SwissProt or NR search):
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/swissprot_blast/swissprot --threads 16
-#   ./scripts/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr_blast/nr --threads 16
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/swissprot_blast/swissprot --threads 16
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr_blast/nr --threads 16
 #
 # INPUT:
 #   <fasta_file>: concatenated FASTA of generated sequences from Step 4

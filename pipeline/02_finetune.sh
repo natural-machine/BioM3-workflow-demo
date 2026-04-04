@@ -7,11 +7,11 @@
 # the network, and trains the last N transformer blocks/layers.
 #
 # USAGE:
-#   ./scripts/02_finetune.sh <hdf5_file> <output_dir> [epochs]
+#   ./pipeline/02_finetune.sh <hdf5_file> <output_dir> [epochs]
 #
 # EXAMPLE:
-#   ./scripts/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning
-#   ./scripts/02_finetune.sh outputs/CM/embeddings/CM_dataset.compiled_emb.hdf5 outputs/CM/finetuning 50
+#   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning
+#   ./pipeline/02_finetune.sh outputs/CM/embeddings/CM_dataset.compiled_emb.hdf5 outputs/CM/finetuning 50
 #
 # INPUT:
 #   <hdf5_file>: compiled embeddings from Step 1

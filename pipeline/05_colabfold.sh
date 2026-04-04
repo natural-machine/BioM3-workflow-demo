@@ -9,11 +9,11 @@
 # Requires the `colabfold` conda environment to be active.
 #
 # USAGE:
-#   ./scripts/05_colabfold.sh <samples_dir> <output_dir> <prefix>
+#   ./pipeline/05_colabfold.sh <samples_dir> <output_dir> <prefix>
 #
 # EXAMPLE:
-#   ./scripts/05_colabfold.sh outputs/SH3/samples outputs/SH3/structures SH3_prompts
-#   ./scripts/05_colabfold.sh outputs/CM/samples outputs/CM/structures CM_prompts
+#   ./pipeline/05_colabfold.sh outputs/SH3/samples outputs/SH3/structures SH3_prompts
+#   ./pipeline/05_colabfold.sh outputs/CM/samples outputs/CM/structures CM_prompts
 #
 # INPUT:
 #   <samples_dir>: directory containing per-prompt FASTA files from Step 4

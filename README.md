@@ -25,7 +25,12 @@ Input CSV (protein sequences + text descriptions)
         ▼                              ▼
 05_colabfold.sh            06_blast_search.sh
   Structure prediction       BLAST homology search
-  (ColabFold/AlphaFold2)     + download reference PDBs
+  (ColabFold/AlphaFold2)     + download reference PDBs (pdbaa only)
+        │                              │
+        │                      06b_fetch_hit_structures.sh
+        │                        Fetch reference structures
+        │                        for SwissProt/other hits
+        │                        (experimental PDB + AlphaFold)
         │                              │
         └──────────┬───────────────────┘
                    ▼
@@ -35,7 +40,7 @@ Input CSV (protein sequences + text descriptions)
         08_plot_results.sh        → Visualization (TM-score, RMSD, pLDDT)
 ```
 
-Each step is a standalone script in `scripts/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel.
+Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel. Step 6b is needed when searching non-PDB databases (SwissProt, NR, etc.) to resolve reference structures for BLAST hits.
 
 ## Prerequisites
 
@@ -157,24 +162,40 @@ Input CSV files should contain at minimum:
 
 ## Usage
 
-Activate your BioM3 environment before running any scripts:
+### Running the pipeline
+
+The recommended way to run the pipeline is with the config-driven runner. Create a TOML config file specifying your inputs, outputs, environments, and which steps to run:
 
 ```bash
-conda activate biom3-env
+# Full pipeline (Steps 1-8)
+python run_pipeline.py configs/pipeline_SH3.toml
+
+# Analysis only (Steps 4-8)
+python run_pipeline.py configs/pipeline_SH3_analysis.toml
+
+# Override steps on the CLI
+python run_pipeline.py configs/pipeline_SH3.toml --steps 6 6b 7 8
+
+# Preview what would run
+python run_pipeline.py configs/pipeline_SH3.toml --dry-run
 ```
+
+The runner activates the correct conda/venv environment for each step automatically. See `configs/pipeline_SH3.toml` for a full example config.
+
+Each step can also be run individually — see the sections below for standalone usage.
 
 ### Step 1: Embedding
 
 Process a CSV through the BioM3 embedding pipeline (PenCL → Facilitator → HDF5 compilation):
 
 ```bash
-./scripts/01_embedding.sh <input_csv> <output_dir>
+./pipeline/01_embedding.sh <input_csv> <output_dir>
 ```
 
 Example:
 
 ```bash
-./scripts/01_embedding.sh data/SH3/SH3_dataset.csv outputs/SH3/embeddings
+./pipeline/01_embedding.sh data/SH3/SH3_dataset.csv outputs/SH3/embeddings
 ```
 
 This produces `outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5`, ready for finetuning.
@@ -184,13 +205,13 @@ This produces `outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5`, ready for 
 Finetune the pretrained ProteoScribe base model on the embedded dataset:
 
 ```bash
-./scripts/02_finetune.sh <hdf5_file> <output_dir> [epochs]
+./pipeline/02_finetune.sh <hdf5_file> <output_dir> [epochs]
 ```
 
 Example:
 
 ```bash
-./scripts/02_finetune.sh \
+./pipeline/02_finetune.sh \
     outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 \
     outputs/SH3/finetuning \
     50
@@ -205,13 +226,13 @@ Finetuning hyperparameters are defined in `configs/config_finetune.sh`. The defa
 Generate novel protein sequences using the finetuned model:
 
 ```bash
-./scripts/03_generate.sh <model_weights> <input_csv> <output_dir>
+./pipeline/03_generate.sh <model_weights> <input_csv> <output_dir>
 ```
 
 Example:
 
 ```bash
-./scripts/03_generate.sh \
+./pipeline/03_generate.sh \
     outputs/SH3/finetuning/checkpoints/.../state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
@@ -219,18 +240,57 @@ Example:
 
 This embeds the input prompts through PenCL and Facilitator (writing to `<output_dir>/embeddings/`), then runs ProteoScribe diffusion sampling to generate sequences. Generated sequences are saved as a `.pt` file in the output directory.
 
+#### Sampling options
+
+Two strategies control how ProteoScribe generates sequences and can be set via CLI flags or in `configs/stage3_config_ProteoScribe_sample.json`:
+
+| Option | Values | Default | Description |
+| ------ | ------ | ------- | ----------- |
+| `--unmasking_order` | `random`, `confidence` | `random` | Order in which masked positions are revealed |
+| `--token_strategy` | `sample`, `argmax` | `sample` | Token selection: stochastic (Gumbel-max) or deterministic |
+
+Example with deterministic generation:
+
+```bash
+./pipeline/03_generate.sh \
+    outputs/SH3/finetuning/checkpoints/.../state_dict.best.pth \
+    data/SH3/SH3_prompts.csv \
+    outputs/SH3/generation \
+    --token_strategy argmax --unmasking_order confidence
+```
+
+#### Animation
+
+Visualise the diffusion denoising process as GIF animations:
+
+```bash
+./pipeline/03_generate.sh \
+    outputs/SH3/finetuning/checkpoints/.../state_dict.best.pth \
+    data/SH3/SH3_prompts.csv \
+    outputs/SH3/generation \
+    --animate_prompts 0 1 2
+```
+
+| Option | Values | Default | Description |
+| ------ | ------ | ------- | ----------- |
+| `--animate_prompts` | indices, `all`, `none` | *(disabled)* | Which prompts to animate |
+| `--animate_replicas` | integer, `all`, `none` | `1` | How many replicas per prompt |
+| `--animation_dir` | path | `<output_dir>/animations/` | Where to write GIFs |
+
+Animations are disabled by default and add negligible overhead when enabled.
+
 ### Step 4: Convert to FASTA
 
 Convert the generated `.pt` file into per-prompt FASTA files:
 
 ```bash
-./scripts/04_samples_to_fasta.sh <input_pt> <output_dir>
+./pipeline/04_samples_to_fasta.sh <input_pt> <output_dir>
 ```
 
 Example:
 
 ```bash
-./scripts/04_samples_to_fasta.sh \
+./pipeline/04_samples_to_fasta.sh \
     outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
     outputs/SH3/samples
 ```
@@ -243,13 +303,13 @@ Predict 3D structures for generated sequences using ColabFold:
 
 ```bash
 conda activate colabfold
-./scripts/05_colabfold.sh <samples_dir> <output_dir> <prefix>
+./pipeline/05_colabfold.sh <samples_dir> <output_dir> <prefix>
 ```
 
 Example:
 
 ```bash
-./scripts/05_colabfold.sh \
+./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures \
     SH3_prompts
@@ -263,7 +323,7 @@ Search for homologous sequences (can run in parallel with Step 5):
 
 ```bash
 conda activate blast-env
-./scripts/06_blast_search.sh <fasta_file> <output_dir> [options]
+./pipeline/06_blast_search.sh <fasta_file> <output_dir> [options]
 ```
 
 The `--db` flag accepts any known NCBI database name or a path to a local database. Known names default to remote search; paths always use local search.
@@ -281,7 +341,7 @@ The `--db` flag accepts any known NCBI database name or a path to a local databa
 Example (remote SwissProt search, default):
 
 ```bash
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast
 ```
@@ -289,7 +349,7 @@ Example (remote SwissProt search, default):
 Example (remote PDB search with structure downloads):
 
 ```bash
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast \
     --db pdbaa
@@ -298,31 +358,59 @@ Example (remote PDB search with structure downloads):
 Example (local SwissProt or NR search):
 
 ```bash
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot --threads 16
 
-./scripts/06_blast_search.sh \
+./pipeline/06_blast_search.sh \
     outputs/SH3/samples/generated_seqs_allprompts.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/nr_blast/nr --threads 16
 ```
 
-By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). Local copies of SwissProt and NR are available under `BioM3-data-share/databases/` (`swissprot_blast/` and `nr_blast/`). PDB file download only occurs for `pdbaa` hits. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). Local copies of SwissProt and NR are available under `BioM3-data-share/databases/` (`swissprot_blast/` and `nr_blast/`). PDB file download only occurs for `pdbaa` hits — for SwissProt or other databases, use Step 6b to fetch reference structures. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+
+### Step 6b: Fetch Reference Structures
+
+Fetch 3D structures for BLAST hits from non-PDB databases (SwissProt, NR, etc.). For each UniProt accession, downloads the best experimental structure from RCSB when available, falling back to AlphaFold DB predicted structures. PDB cross-references are resolved from a local `uniprot_sprot.dat.gz` (auto-detected at `../BioM3-data-share/databases/swissprot/`) or via the UniProt REST API.
+
+```bash
+./pipeline/06b_fetch_hit_structures.sh <blast_tsv> <output_dir> [options]
+```
+
+Example:
+
+```bash
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/SH3/blast/blast_hit_results.tsv \
+    outputs/SH3/blast
+```
+
+Example (AlphaFold only, skip experimental PDB lookup):
+
+```bash
+./pipeline/06b_fetch_hit_structures.sh \
+    outputs/SH3/blast/blast_hit_results.tsv \
+    outputs/SH3/blast --alphafold-only
+```
+
+Structures are saved as `{accession}.pdb` in `<output_dir>/reference_structures/`, which integrates directly with Step 7. A `structure_manifest.tsv` is written with source metadata (experimental vs. AlphaFold, PDB ID, resolution) for each accession.
+
+Options: `--swissprot-dat <path>`, `--no-local-dat`, `--alphafold-only`, `--experimental-only`.
 
 ### Step 7: Structure Comparison (TMalign)
 
 Compare predicted structures against BLAST reference structures:
 
 ```bash
-./scripts/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
+./pipeline/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
 ```
 
 Example:
 
 ```bash
-./scripts/07_compare_structures.sh \
+./pipeline/07_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
@@ -337,13 +425,13 @@ This produces `results.csv` with TM-score, RMSD, and sequence identity for each 
 Generate plots from the comparison metrics:
 
 ```bash
-./scripts/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
+./pipeline/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
 ```
 
 Example:
 
 ```bash
-./scripts/08_plot_results.sh \
+./pipeline/08_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
@@ -355,37 +443,44 @@ This produces strip plots for TM-score, RMSD, sequence identity, and (optionally
 
 ```
 BioM3-workflow-demo/
-├── run_pipeline_SH3.sh                         # Example analysis pipeline (Steps 4-8)
+├── run_pipeline.py                             # Config-driven pipeline runner
+├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 4-8)
 ├── configs/
-│   ├── config_finetune.sh                      # Finetuning hyperparameters
-│   ├── stage1_config_PenCL_inference.json      # PenCL model config
-│   ├── stage2_config_Facilitator_sample.json   # Facilitator model config
-│   └── stage3_config_ProteoScribe_sample.json  # ProteoScribe sampling config
-├── scripts/
-│   ├── 01_embedding.sh                         # Step 1: CSV → HDF5
-│   ├── 02_finetune.sh                          # Step 2: HDF5 → finetuned model
-│   ├── 03_generate.sh                          # Step 3: prompts → sequences
-│   ├── 04_samples_to_fasta.sh                  # Step 4: .pt → FASTA
-│   ├── 05_colabfold.sh                         # Step 5: FASTA → predicted structures
-│   ├── 06_blast_search.sh                      # Step 6: FASTA → BLAST hits
-│   ├── 07_compare_structures.sh                # Step 7: TMalign comparison
-│   ├── 08_plot_results.sh                      # Step 8: metric plots
-│   ├── samples_to_fasta.py                     # Python helper for Step 4
-│   ├── make_plots.py                           # Python helper for Step 8
-│   ├── sync_weights.sh                         # Sync weights from shared directory
-│   └── sync_databases.sh                       # Sync databases from shared directory
+│   ├── pipeline_SH3.toml                      # Pipeline config: SH3, full (Steps 1-8)
+│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 4-8)
+│   ├── pipeline_CM.toml                       # Pipeline config: CM, full (Steps 1-8)
+│   ├── config_finetune.sh                     # Finetuning hyperparameters
+│   ├── stage1_config_PenCL_inference.json     # PenCL model config
+│   ├── stage2_config_Facilitator_sample.json  # Facilitator model config
+│   └── stage3_config_ProteoScribe_sample.json # ProteoScribe sampling config
+├── pipeline/                                   # Pipeline step scripts
+│   ├── 01_embedding.sh                        # Step 1: CSV → HDF5
+│   ├── 02_finetune.sh                         # Step 2: HDF5 → finetuned model
+│   ├── 03_generate.sh                         # Step 3: prompts → sequences
+│   ├── 04_samples_to_fasta.sh                 # Step 4: .pt → FASTA
+│   ├── 05_colabfold.sh                        # Step 5: FASTA → predicted structures
+│   ├── 06_blast_search.sh                     # Step 6: FASTA → BLAST hits
+│   ├── 06b_fetch_hit_structures.sh            # Step 6b: fetch structures for non-PDB hits
+│   ├── 07_compare_structures.sh               # Step 7: TMalign comparison
+│   └── 08_plot_results.sh                     # Step 8: metric plots
+├── scripts/                                    # Helpers and utilities
+│   ├── samples_to_fasta.py                    # Python helper for Step 4
+│   ├── fetch_hit_structures.py                # Python helper for Step 6b
+│   ├── make_plots.py                          # Python helper for Step 8
+│   ├── sync_weights.sh                        # Sync weights from shared directory
+│   └── sync_databases.sh                      # Sync databases from shared directory
 ├── data/                                       # Input datasets (per family)
-│   └── databases/                              # Reference databases (optional, for local BLAST)
+│   └── databases/                             # Reference databases (optional, for local BLAST)
 ├── outputs/                                    # Pipeline outputs (per family)
 │   └── <family>/
-│       ├── embeddings/                         # Step 1: embedding outputs
-│       ├── finetuning/                         # Step 2: checkpoints and logs
-│       ├── generation/                         # Step 3: generated sequences
-│       ├── samples/                            # Step 4: FASTA files
-│       ├── structures/                         # Step 5: ColabFold PDBs and results
-│       ├── blast/                              # Step 6: BLAST hits and reference PDBs
-│       ├── comparison/                         # Step 7: TMalign metrics
-│       └── images/                             # Step 8: plots
+│       ├── embeddings/                        # Step 1: embedding outputs
+│       ├── finetuning/                        # Step 2: checkpoints and logs
+│       ├── generation/                        # Step 3: generated sequences
+│       ├── samples/                           # Step 4: FASTA files
+│       ├── structures/                        # Step 5: ColabFold PDBs and results
+│       ├── blast/                             # Step 6: BLAST hits and reference PDBs
+│       ├── comparison/                        # Step 7: TMalign metrics
+│       └── images/                            # Step 8: plots
 └── weights/                                    # Pretrained model weights
 ```
 
@@ -393,7 +488,16 @@ BioM3-workflow-demo/
 
 ### Inference configs (`configs/*.json`)
 
-The JSON config files control model architecture and inference parameters. These should not need modification unless you are using different backbone weights.
+The JSON config files control model architecture and inference parameters. Most fields should not need modification unless you are using different backbone weights. The Stage 3 config includes sampling parameters you may want to adjust:
+
+| Parameter | Default | Description |
+| --------- | ------- | ----------- |
+| `unmasking_order` | `random` | Position reveal order: `random` or `confidence` (most-confident first) |
+| `token_strategy` | `sample` | Token selection: `sample` (stochastic, Gumbel-max) or `argmax` (deterministic) |
+| `num_replicas` | `5` | Number of sequences generated per prompt |
+| `diffusion_steps` | `1024` | Number of diffusion steps |
+
+These can also be overridden per-run via CLI flags (see Step 3).
 
 ### Finetuning config (`configs/config_finetune.sh`)
 
