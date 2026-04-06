@@ -235,7 +235,7 @@ Example:
 
 This loads `weights/ProteoScribe/ProteoScribe_epoch200.pth`, freezes most of the network, and trains the last transformer block. Checkpoints and logs are saved under the specified output directory.
 
-Finetuning hyperparameters are defined in `configs/stage3_config_finetune.json`. The defaults are tuned for the DGX Spark (single GPU, bf16 precision).
+Finetuning hyperparameters are defined in `configs/stage3_training/finetune.json`. The defaults are tuned for the DGX Spark (single GPU, bf16 precision).
 
 ### Step 3: Generation
 
@@ -258,7 +258,7 @@ This embeds the input prompts through PenCL and Facilitator (writing to `<output
 
 #### Sampling options
 
-Two strategies control how ProteoScribe generates sequences and can be set via CLI flags or in `configs/stage3_config_ProteoScribe_sample.json`:
+Two strategies control how ProteoScribe generates sequences and can be set via CLI flags or in `configs/inference/stage3_ProteoScribe_sample.json`:
 
 | Option | Values | Default | Description |
 | ------ | ------ | ------- | ----------- |
@@ -475,21 +475,20 @@ Options: `--port PORT` (default: 8501).
 ```
 BioM3-workflow-demo/
 ├── run_pipeline.py                             # Config-driven pipeline runner
-├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 4-7)
 ├── configs/
 │   ├── pipelines/                             # TOML pipeline configs
 │   │   ├── SH3.toml                          # SH3 full pipeline (Steps 1-7)
 │   │   ├── SH3_analysis.toml                # SH3 analysis only (Steps 4-7)
 │   │   ├── SH3_mini.toml                    # SH3 mini subset (quick test)
 │   │   └── CM.toml                           # CM full pipeline (Steps 1-7)
-│   ├── stage3_config_finetune.json            # Finetuning hyperparameters (JSON)
-│   ├── stage1_config_PenCL_inference.json     # PenCL inference config
-│   ├── stage2_config_Facilitator_sample.json  # Facilitator inference config
-│   ├── stage3_config_ProteoScribe_sample.json # ProteoScribe sampling config
-│   ├── models/                                # Base model architecture configs
-│   │   ├── _base_PenCL.json
-│   │   ├── _base_Facilitator.json
-│   │   └── _base_ProteoScribe_1block.json
+│   ├── inference/                             # Inference configs (Stages 1-3)
+│   │   ├── stage1_PenCL.json
+│   │   ├── stage2_Facilitator.json
+│   │   ├── stage3_ProteoScribe_sample.json
+│   │   └── models/                           # Base model configs (PenCL, Facilitator)
+│   ├── stage3_training/                       # Training configs (Stage 3)
+│   │   ├── finetune.json
+│   │   └── models/                           # Base model config (ProteoScribe)
 │   └── app_settings.json                    # Web app browsable directories
 ├── pipeline/                                   # Pipeline step scripts
 │   ├── 01_embedding.sh                        # Step 1: CSV → HDF5
@@ -538,7 +537,7 @@ The JSON config files control model architecture and inference parameters. Most 
 
 These can also be overridden per-run via CLI flags (see Step 3).
 
-### Finetuning config (`configs/stage3_config_finetune.json`)
+### Finetuning config (`configs/stage3_training/finetune.json`)
 
 Key parameters you may want to adjust:
 

@@ -10,13 +10,13 @@
 #   ./pipeline/02_finetune.sh <hdf5_file> <output_dir> [epochs] [options]
 #
 # OPTIONS:
-#   --config PATH       JSON training config (default: configs/stage3_config_finetune.json)
+#   --config PATH       JSON training config (default: configs/stage3_training/finetune.json)
 #
 # EXAMPLE:
 #   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning
 #   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning 50
 #   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning \
-#       --config configs/stage3_config_finetune.json
+#       --config configs/stage3_training/finetune.json
 #
 # INPUT:
 #   <hdf5_file>: compiled embeddings from Step 1
@@ -66,7 +66,7 @@ done
 projdir=$(cd "$(dirname "$0")/.." && pwd)
 cd ${projdir}
 
-config_path="${config_path:-configs/stage3_config_finetune.json}"
+config_path="${config_path:-configs/stage3_training/finetune.json}"
 device="${BIOM3_DEVICE:-cuda}"
 
 if [ ! -f "${hdf5_file}" ]; then

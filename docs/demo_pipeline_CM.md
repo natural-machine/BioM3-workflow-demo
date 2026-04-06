@@ -28,21 +28,21 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 
 | Config file | Used by | Purpose |
 | --- | --- | --- |
-| `configs/stage1_config_PenCL_inference.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | PenCL inference: ESM-2 + BiomedBERT encoding into shared 512-dim space |
-| `configs/stage2_config_Facilitator_sample.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | Facilitator sampling: MMD alignment of text → protein embedding distribution |
-| `configs/stage3_config_finetune.json` | Step 2 (`02_finetune.sh`) | Finetuning: JSON training config with hyperparameters, optimizer, hardware, and W&B settings |
-| `configs/stage3_config_ProteoScribe_sample.json` | Step 3 (`03_generate.sh`) | ProteoScribe diffusion sampling parameters for sequence generation |
+| `configs/inference/stage1_PenCL.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | PenCL inference: ESM-2 + BiomedBERT encoding into shared 512-dim space |
+| `configs/inference/stage2_Facilitator.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | Facilitator sampling: MMD alignment of text → protein embedding distribution |
+| `configs/stage3_training/finetune.json` | Step 2 (`02_finetune.sh`) | Finetuning: JSON training config with hyperparameters, optimizer, hardware, and W&B settings |
+| `configs/inference/stage3_ProteoScribe_sample.json` | Step 3 (`03_generate.sh`) | ProteoScribe diffusion sampling parameters for sequence generation |
 
 ### Key parameters you may want to adjust
 
-**`stage1_config_PenCL_inference.json`** — Embedding (PenCL):
+**`inference/stage1_PenCL.json`** — Embedding (PenCL):
 - `batch_size` (default 80): reduce if you hit GPU OOM during embedding
 - `num_workers` (default 12): dataloader workers; match to available CPU cores
 
-**`stage2_config_Facilitator_sample.json`** — Embedding (Facilitator):
+**`inference/stage2_Facilitator.json`** — Embedding (Facilitator):
 - `batch_size` (default 64): reduce if you hit GPU OOM during facilitator sampling
 
-**`stage3_config_finetune.json`** — Finetuning:
+**`stage3_training/finetune.json`** — Finetuning:
 - `epochs` (default 20): number of training epochs (can also be overridden via the CLI arg to `02_finetune.sh`)
 - `lr` (default 1e-4): learning rate
 - `batch_size` (default 32): training batch size
@@ -50,7 +50,7 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 - `finetune_last_n_blocks` / `finetune_last_n_layers` (default 1): how many transformer blocks/layers to unfreeze
 - `wandb` (default False): set to `True` to enable W&B logging
 
-**`stage3_config_ProteoScribe_sample.json`** — Generation:
+**`inference/stage3_ProteoScribe_sample.json`** — Generation:
 - `num_replicas` (default 5): number of sequences generated per prompt
 - `batch_size_sample` (default 32): sampling batch size
 - `diffusion_steps` (default 1024): number of diffusion steps; more steps = higher quality but slower

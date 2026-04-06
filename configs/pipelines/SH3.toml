@@ -18,7 +18,7 @@ epochs      = 50
 # pt_file       = "outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt"
 
 [finetuning]
-config = "configs/stage3_config_finetune.json"
+config = "configs/stage3_training/finetune.json"
 
 [blast]
 db      = "swissprot"

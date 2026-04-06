@@ -16,7 +16,7 @@ prompts_csv = "data/CM/CM_prompts.csv"
 epochs      = 50
 
 [finetuning]
-config = "configs/stage3_config_finetune.json"
+config = "configs/stage3_training/finetune.json"
 
 [blast]
 db      = "swissprot"
