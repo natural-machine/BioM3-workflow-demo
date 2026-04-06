@@ -17,7 +17,7 @@ See [docs/biom3_ecosystem.md](./docs/biom3_ecosystem.md) for cross-repo workflow
 
 ## Overview
 
-The workflow consists of eight steps:
+The workflow consists of nine steps:
 
 ```txt
 Input CSV (protein sequences + text descriptions)
@@ -30,9 +30,7 @@ Input CSV (protein sequences + text descriptions)
         │
         ▼
 03_generate.sh             → Generate novel protein sequences from text prompts
-        │
-        ▼
-04_samples_to_fasta.sh     → Convert .pt output to FASTA files
+        │                    (produces FASTA output with --fasta --fasta_merge)
         │
         ├──────────────────────────────┐
         ▼                              ▼
@@ -51,13 +49,17 @@ Input CSV (protein sequences + text descriptions)
                    │
                    ▼
         08_plot_results.sh        → Visualization (TM-score, RMSD, pLDDT)
+                   │
+                   ▼
+        09_webapp.sh              → Interactive web app (structure viewer,
+                                    alignment, unmasking order, BLAST)
 ```
 
-Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel. Step 6b is needed when searching non-PDB databases (SwissProt, NR, etc.) to resolve reference structures for BLAST hits.
+Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel. Step 6b is needed when searching non-PDB databases (SwissProt, NR, etc.) to resolve reference structures for BLAST hits. Step 9 launches an interactive web app for exploring outputs.
 
 ## Prerequisites
 
-**Required (Steps 1-4):**
+**Required (Steps 1-3):**
 
 - A working installation of the [BioM3-dev](https://github.com/addison-nm/BioM3-dev) package
 - Pretrained model weights in the `weights/` directory
@@ -69,6 +71,7 @@ Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html) — for homology search (Step 6)
 - [TMalign](https://zhanggroup.org/TM-align/) — for structural comparison (Step 7)
 - matplotlib, seaborn, pandas — for plotting (Step 8)
+- [Streamlit](https://streamlit.io/), [py3Dmol](https://github.com/arichardsmith/py3Dmol) — for the web app (Step 9, included with BioM3-dev)
 
 ## Installation and setup
 
@@ -232,7 +235,7 @@ Example:
 
 This loads `weights/ProteoScribe/ProteoScribe_epoch200.pth`, freezes most of the network, and trains the last transformer block. Checkpoints and logs are saved under the specified output directory.
 
-Finetuning hyperparameters are defined in `configs/config_finetune.sh`. The defaults are tuned for the DGX Spark (single GPU, bf16 precision).
+Finetuning hyperparameters are defined in `configs/stage3_config_finetune.json`. The defaults are tuned for the DGX Spark (single GPU, bf16 precision).
 
 ### Step 3: Generation
 
@@ -259,8 +262,9 @@ Two strategies control how ProteoScribe generates sequences and can be set via C
 
 | Option | Values | Default | Description |
 | ------ | ------ | ------- | ----------- |
-| `--unmasking_order` | `random`, `confidence` | `random` | Order in which masked positions are revealed |
+| `--unmasking_order` | `random`, `confidence`, `confidence_no_pad` | `random` | Order in which masked positions are revealed |
 | `--token_strategy` | `sample`, `argmax` | `sample` | Token selection: stochastic (Gumbel-max) or deterministic |
+| `--store_probabilities` | *(flag)* | off | Store per-step conditional probability distributions as `.npz` files. Memory-intensive for long sequences or many replicas |
 
 Example with deterministic generation:
 
@@ -289,26 +293,18 @@ Visualise the diffusion denoising process as GIF animations:
 | `--animate_prompts` | indices, `all`, `none` | *(disabled)* | Which prompts to animate |
 | `--animate_replicas` | integer, `all`, `none` | `1` | How many replicas per prompt |
 | `--animation_dir` | path | `<output_dir>/animations/` | Where to write GIFs |
+| `--animation_style` | `brightness`, `colorbar`, `logo` | `brightness` | Probability visualization style. `colorbar` and `logo` require `--store_probabilities` |
+| `--animation_metrics` | metric names | *(none)* | Per-position metric annotation boxes (e.g. `confidence`). Requires `--store_probabilities` |
 
 Animations are disabled by default and add negligible overhead when enabled.
 
-### Step 4: Convert to FASTA
+### Step 4: Convert to FASTA (standalone utility)
 
-Convert the generated `.pt` file into per-prompt FASTA files:
+> **Note:** Step 4 is no longer part of the automated pipeline — Step 3 now produces FASTA directly with `--fasta --fasta_merge`. This script is kept as a standalone utility for manual `.pt`-to-FASTA conversion.
 
 ```bash
 ./pipeline/04_samples_to_fasta.sh <input_pt> <output_dir>
 ```
-
-Example:
-
-```bash
-./pipeline/04_samples_to_fasta.sh \
-    outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
-    outputs/SH3/samples
-```
-
-This produces one FASTA file per prompt plus a concatenated `generated_seqs_allprompts.fasta`. The number of prompts and replicas is detected automatically from the `.pt` file.
 
 ### Step 5: Structure Prediction (ColabFold)
 
@@ -316,7 +312,7 @@ Predict 3D structures for generated sequences using ColabFold:
 
 ```bash
 conda activate colabfold
-./pipeline/05_colabfold.sh <samples_dir> <output_dir> <prefix>
+./pipeline/05_colabfold.sh <fasta_dir> <output_dir>
 ```
 
 Example:
@@ -324,8 +320,7 @@ Example:
 ```bash
 ./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
-    outputs/SH3/structures \
-    SH3_prompts
+    outputs/SH3/structures
 ```
 
 This runs `colabfold_batch` on each per-prompt FASTA file and produces PDB structures and a summary CSV with pLDDT and pTM scores.
@@ -355,7 +350,7 @@ Example (remote SwissProt search, default):
 
 ```bash
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 ```
 
@@ -363,7 +358,7 @@ Example (remote PDB search with structure downloads):
 
 ```bash
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db pdbaa
 ```
@@ -372,12 +367,12 @@ Example (local SwissProt or NR search):
 
 ```bash
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot --threads 16
 
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/nr_blast/nr --threads 16
 ```
@@ -452,32 +447,61 @@ Example:
 
 This produces strip plots for TM-score, RMSD, sequence identity, and (optionally) pLDDT.
 
+### Step 9: Web App
+
+Launch the BioM3 interactive web application for exploring pipeline outputs:
+
+```bash
+./pipeline/09_webapp.sh
+```
+
+This starts a Streamlit app at `http://localhost:8501` with six analysis pages:
+
+| Page | Description |
+| ---- | ----------- |
+| View Structure | Load a PDB file and render it in 3D with configurable style and coloring |
+| Align Structures | Superimpose two structures on C-alpha atoms, report RMSD |
+| Highlight Residues | Color selected residue positions on a structure |
+| Color by Values | Map per-residue float values (pLDDT, conservation) onto a structure with colormaps |
+| Unmasking Order | Visualize the diffusion generation order from a Step 3 `.pt` output |
+| BLAST Search | Run a remote NCBI BLAST search from a protein sequence |
+
+The app browses data directories configured in `configs/app_data_dirs.json`. By default it exposes `outputs/`, `data/`, and `weights/`. Each page also supports direct file upload.
+
+Options: `--port PORT` (default: 8501).
+
 ## Repository structure
 
 ```
 BioM3-workflow-demo/
 ├── run_pipeline.py                             # Config-driven pipeline runner
-├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 4-8)
+├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 5-8)
 ├── configs/
 │   ├── pipeline_SH3.toml                      # Pipeline config: SH3, full (Steps 1-8)
-│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 4-8)
+│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 5-8)
 │   ├── pipeline_CM.toml                       # Pipeline config: CM, full (Steps 1-8)
-│   ├── config_finetune.sh                     # Finetuning hyperparameters
-│   ├── stage1_config_PenCL_inference.json     # PenCL model config
-│   ├── stage2_config_Facilitator_sample.json  # Facilitator model config
-│   └── stage3_config_ProteoScribe_sample.json # ProteoScribe sampling config
+│   ├── stage3_config_finetune.json            # Finetuning hyperparameters (JSON)
+│   ├── stage1_config_PenCL_inference.json     # PenCL inference config
+│   ├── stage2_config_Facilitator_sample.json  # Facilitator inference config
+│   ├── stage3_config_ProteoScribe_sample.json # ProteoScribe sampling config
+│   ├── models/                                # Base model architecture configs
+│   │   ├── _base_PenCL.json
+│   │   ├── _base_Facilitator.json
+│   │   └── _base_ProteoScribe_1block.json
+│   └── app_data_dirs.json                    # Web app browsable directories
 ├── pipeline/                                   # Pipeline step scripts
 │   ├── 01_embedding.sh                        # Step 1: CSV → HDF5
 │   ├── 02_finetune.sh                         # Step 2: HDF5 → finetuned model
 │   ├── 03_generate.sh                         # Step 3: prompts → sequences
-│   ├── 04_samples_to_fasta.sh                 # Step 4: .pt → FASTA
+│   ├── 04_samples_to_fasta.sh                 # Standalone utility: .pt → FASTA
 │   ├── 05_colabfold.sh                        # Step 5: FASTA → predicted structures
 │   ├── 06_blast_search.sh                     # Step 6: FASTA → BLAST hits
 │   ├── 06b_fetch_hit_structures.sh            # Step 6b: fetch structures for non-PDB hits
 │   ├── 07_compare_structures.sh               # Step 7: TMalign comparison
-│   └── 08_plot_results.sh                     # Step 8: metric plots
+│   ├── 08_plot_results.sh                     # Step 8: metric plots
+│   └── 09_webapp.sh                          # Step 9: interactive web app
 ├── scripts/                                    # Helpers and utilities
-│   ├── samples_to_fasta.py                    # Python helper for Step 4
+│   ├── samples_to_fasta.py                    # Python helper for FASTA conversion
 │   ├── fetch_hit_structures.py                # Python helper for Step 6b
 │   ├── make_plots.py                          # Python helper for Step 8
 │   ├── sync_weights.sh                        # Sync weights from shared directory
@@ -489,7 +513,7 @@ BioM3-workflow-demo/
 │       ├── embeddings/                        # Step 1: embedding outputs
 │       ├── finetuning/                        # Step 2: checkpoints and logs
 │       ├── generation/                        # Step 3: generated sequences
-│       ├── samples/                           # Step 4: FASTA files
+│       ├── samples/                           # Step 3: FASTA output (--fasta)
 │       ├── structures/                        # Step 5: ColabFold PDBs and results
 │       ├── blast/                             # Step 6: BLAST hits and reference PDBs
 │       ├── comparison/                        # Step 7: TMalign metrics
@@ -505,14 +529,14 @@ The JSON config files control model architecture and inference parameters. Most 
 
 | Parameter | Default | Description |
 | --------- | ------- | ----------- |
-| `unmasking_order` | `random` | Position reveal order: `random` or `confidence` (most-confident first) |
+| `unmasking_order` | `random` | Position reveal order: `random`, `confidence` (most-confident first), or `confidence_no_pad` (confidence, skipping PAD predictions) |
 | `token_strategy` | `sample` | Token selection: `sample` (stochastic, Gumbel-max) or `argmax` (deterministic) |
 | `num_replicas` | `5` | Number of sequences generated per prompt |
 | `diffusion_steps` | `1024` | Number of diffusion steps |
 
 These can also be overridden per-run via CLI flags (see Step 3).
 
-### Finetuning config (`configs/config_finetune.sh`)
+### Finetuning config (`configs/stage3_config_finetune.json`)
 
 Key parameters you may want to adjust:
 
@@ -525,6 +549,7 @@ Key parameters you may want to adjust:
 | `finetune_last_n_blocks` | 1 | Number of transformer blocks to unfreeze |
 | `finetune_last_n_layers` | 1 | Number of layers per block to unfreeze |
 | `precision` | bf16 | Training precision |
+| `wandb` | false | Enable Weights & Biases logging |
 
 ## References
 

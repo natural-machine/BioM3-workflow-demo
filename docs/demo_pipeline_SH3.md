@@ -28,7 +28,7 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 | --- | --- | --- |
 | `configs/stage1_config_PenCL_inference.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | PenCL inference: ESM-2 + BiomedBERT encoding into shared 512-dim space |
 | `configs/stage2_config_Facilitator_sample.json` | Steps 1, 3 (`01_embedding.sh`, `03_generate.sh`) | Facilitator sampling: MMD alignment of text → protein embedding distribution |
-| `configs/config_finetune.sh` | Step 2 (`02_finetune.sh`) | Finetuning hyperparameters, optimizer settings, hardware config, and W&B logging |
+| `configs/stage3_config_finetune.json` | Step 2 (`02_finetune.sh`) | Finetuning: JSON training config with hyperparameters, optimizer, hardware, and W&B settings |
 | `configs/stage3_config_ProteoScribe_sample.json` | Step 3 (`03_generate.sh`) | ProteoScribe diffusion sampling parameters for sequence generation |
 
 ### Key parameters you may want to adjust
@@ -40,19 +40,19 @@ The pipeline is driven by JSON and shell config files in `configs/`. Each script
 **`stage2_config_Facilitator_sample.json`** — Embedding (Facilitator):
 - `batch_size` (default 64): reduce if you hit GPU OOM during facilitator sampling
 
-**`config_finetune.sh`** — Finetuning:
+**`stage3_config_finetune.json`** — Finetuning:
 - `epochs` (default 20): number of training epochs (can also be overridden via the CLI arg to `02_finetune.sh`)
 - `lr` (default 1e-4): learning rate
 - `batch_size` (default 32): training batch size
 - `precision` (default bf16): set to `fp32` or `16` depending on GPU support
 - `finetune_last_n_blocks` / `finetune_last_n_layers` (default 1): how many transformer blocks/layers to unfreeze
-- `wandb` (default True): set to `False` to disable W&B logging
+- `wandb` (default False): set to `True` to enable W&B logging
 
 **`stage3_config_ProteoScribe_sample.json`** — Generation:
 - `num_replicas` (default 5): number of sequences generated per prompt
 - `batch_size_sample` (default 32): sampling batch size
 - `diffusion_steps` (default 1024): number of diffusion steps; more steps = higher quality but slower
-- `unmasking_order` (default `random`): position unmasking order; `random` or `confidence` (most-confident first)
+- `unmasking_order` (default `random`): position unmasking order; `random`, `confidence` (most-confident first), or `confidence_no_pad` (confidence, skipping PAD predictions)
 - `token_strategy` (default `sample`): token selection; `sample` (stochastic, Gumbel-max) or `argmax` (deterministic)
 
 Runtime paths (e.g. `data_path`, `output_dict_path`) are set to `"None"` in the config files and are overridden by the scripts at execution time — you do not need to edit those fields.
@@ -108,15 +108,17 @@ This runs 50 epochs of finetuning with the last transformer block unfrozen. To u
 
 ```
 outputs/SH3/finetuning/
-    logs/
-        finetune_n1_d1_e50_V<timestamp>.o       # Training log
     checkpoints/
-        lightning_logs/
-            finetune_n1_d1_e50_V<timestamp>/
-                last.ckpt                         # Latest checkpoint
-                epoch=XX-step=XXXXX.ckpt          # Best checkpoint(s)
-                state_dict.best.pth               # Best weights (raw state dict)
-                build_manifest.json               # Training metadata and parameters
+        <run_id>/
+            last.ckpt                         # Latest checkpoint
+            epoch=XX-step=XXXXX.ckpt          # Best checkpoint(s)
+            state_dict.best.pth               # Best weights (raw state dict)
+    runs/
+        <run_id>/
+            artifacts/
+                args.json                     # Training arguments
+                build_manifest.json           # Training metadata
+                run.log                       # Training log
 ```
 
 ## Step 3: Sequence Generation
@@ -125,12 +127,12 @@ Generate novel SH3 protein sequences using the finetuned model. The input CSV sh
 
 ```bash
 ./pipeline/03_generate.sh \
-    outputs/SH3/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
+    outputs/SH3/finetuning/checkpoints/<run_id>/state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
 ```
 
-> **Note:** Replace `<timestamp>` with the actual timestamp from your finetuning run. You can find the checkpoint path in the finetuning log output.
+> **Note:** Replace `<run_id>` with the actual run ID from your finetuning run. You can find the checkpoint path in the finetuning log output.
 
 ### What this does
 
@@ -143,7 +145,7 @@ To use deterministic generation (argmax) with confidence-based unmasking:
 
 ```bash
 ./pipeline/03_generate.sh \
-    outputs/SH3/finetuning/checkpoints/lightning_logs/finetune_n1_d1_e50_V<timestamp>/state_dict.best.pth \
+    outputs/SH3/finetuning/checkpoints/<run_id>/state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation \
     --token_strategy argmax --unmasking_order confidence
@@ -159,7 +161,18 @@ To generate GIF animations of the denoising process for all prompts:
     --animate_prompts all --animate_replicas 10
 ```
 
-GIFs are saved to `outputs/SH3/generation/animations/` by default. See `--animate_prompts`, `--animate_replicas`, and `--animation_dir` in the main README for full details.
+To generate a colored animation with per-position confidence annotations:
+
+```bash
+./pipeline/03_generate.sh \
+    weights/ProteoScribe/ProteoScribe_SH3_epoch52.ckpt \
+    data/SH3/SH3_prompts.csv \
+    outputs/SH3/generation \
+    --animate_prompts 0 --store_probabilities \
+    --animation_style colorbar --animation_metrics confidence
+```
+
+GIFs are saved to `outputs/SH3/generation/animations/` by default. The `--animation_style` option controls probability visualization (`brightness`, `colorbar`, or `logo`); `colorbar` and `logo` require `--store_probabilities`. See the main README for full details on all animation and probability options.
 
 ### Expected outputs
 
@@ -175,8 +188,19 @@ outputs/SH3/generation/
     animations/                           # GIF animations (if --animate_prompts used)
         prompt_0_replica_0.gif
         ...
+    probabilities/                        # Per-step probabilities (if --store_probabilities used)
+        prompt_0_replica_0.npz
+        ...
     build_manifest.json                   # Generation metadata
     run.log
+```
+
+```
+outputs/SH3/samples/                          # FASTA output (--fasta --fasta_merge)
+    prompt_0.fasta                            # Per-prompt sequences
+    prompt_1.fasta
+    ...
+    all_sequences.fasta                       # All prompts merged
 ```
 
 ### Using pretrained SH3 weights
@@ -190,7 +214,7 @@ If you want to skip finetuning and generate sequences directly, pretrained SH3 w
     outputs/SH3/generation
 ```
 
-## Steps 4-8: Analysis Pipeline
+## Steps 5-8: Analysis Pipeline
 
 After generation, run the analysis pipeline to predict structures, search for homologs, and evaluate results:
 
@@ -198,17 +222,7 @@ After generation, run the analysis pipeline to predict structures, search for ho
 python run_pipeline.py configs/pipeline_SH3_analysis.toml
 ```
 
-This runs Steps 4 through 8 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
-
-### Step 4: Convert to FASTA
-
-```bash
-./pipeline/04_samples_to_fasta.sh \
-    outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
-    outputs/SH3/samples
-```
-
-Produces per-prompt FASTA files and a concatenated `generated_seqs_allprompts.fasta`.
+This runs Steps 5 through 8 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
 
 ### Step 5: Structure Prediction (ColabFold)
 
@@ -216,8 +230,7 @@ Produces per-prompt FASTA files and a concatenated `generated_seqs_allprompts.fa
 conda activate colabfold
 ./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
-    outputs/SH3/structures \
-    SH3_prompts
+    outputs/SH3/structures
 ```
 
 Runs ColabFold on each per-prompt FASTA and produces `colabfold_results.csv` with pLDDT and pTM scores.
@@ -227,7 +240,7 @@ Runs ColabFold on each per-prompt FASTA and produces `colabfold_results.csv` wit
 ```bash
 conda activate blast-env
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 ```
 
@@ -269,6 +282,16 @@ Compares predicted structures against BLAST reference structures using TMalign.
 
 Generates strip plots for TM-score, RMSD, sequence identity, and pLDDT.
 
+### Step 9: Web App
+
+Launch the interactive web app to explore pipeline outputs — view and align structures, color residues by metrics (pLDDT, conservation), visualize diffusion unmasking order, and run BLAST searches.
+
+```bash
+./pipeline/09_webapp.sh
+```
+
+Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_data_dirs.json`. Use `--port` to change the port.
+
 ## Full pipeline (all commands)
 
 ```bash
@@ -288,27 +311,21 @@ conda activate biom3-env
 
 # 3. Generation (update the checkpoint path from your finetuning output)
 ./pipeline/03_generate.sh \
-    outputs/SH3/finetuning/checkpoints/lightning_logs/<version_name>/state_dict.best.pth \
+    outputs/SH3/finetuning/checkpoints/<run_id>/state_dict.best.pth \
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
 
-# Steps 4-8: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
-# 4. FASTA conversion
-./pipeline/04_samples_to_fasta.sh \
-    outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt \
-    outputs/SH3/samples
-
+# Steps 5-8: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
 # 5. ColabFold (requires colabfold env)
 conda activate colabfold
 ./pipeline/05_colabfold.sh \
     outputs/SH3/samples \
-    outputs/SH3/structures \
-    SH3_prompts
+    outputs/SH3/structures
 
 # 6. BLAST (requires blast-env)
 conda activate blast-env
 ./pipeline/06_blast_search.sh \
-    outputs/SH3/samples/generated_seqs_allprompts.fasta \
+    outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 
 # 6b. Fetch reference structures (for SwissProt/non-pdbaa hits)
@@ -329,4 +346,7 @@ conda activate blast-env
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
+
+# 9. Web app (interactive exploration)
+./pipeline/09_webapp.sh
 ```

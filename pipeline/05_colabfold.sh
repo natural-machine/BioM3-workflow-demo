@@ -3,22 +3,22 @@
 # Step 5: Structure Prediction with ColabFold
 #
 # Runs ColabFold (AlphaFold2) structure prediction on per-prompt FASTA files
-# from Step 4. After all predictions complete, parses the ColabFold log files
-# to extract pLDDT and pTM scores into a summary CSV.
+# produced by Step 3 (with --fasta). After all predictions complete, parses
+# the ColabFold log files to extract pLDDT and pTM scores into a summary CSV.
 #
 # Requires the `colabfold` conda environment to be active.
 #
 # USAGE:
-#   ./pipeline/05_colabfold.sh <samples_dir> <output_dir> <prefix>
+#   ./pipeline/05_colabfold.sh <fasta_dir> <output_dir>
 #
 # EXAMPLE:
-#   ./pipeline/05_colabfold.sh outputs/SH3/samples outputs/SH3/structures SH3_prompts
-#   ./pipeline/05_colabfold.sh outputs/CM/samples outputs/CM/structures CM_prompts
+#   ./pipeline/05_colabfold.sh outputs/SH3/samples outputs/SH3/structures
+#   ./pipeline/05_colabfold.sh outputs/CM/samples outputs/CM/structures
 #
 # INPUT:
-#   <samples_dir>: directory containing per-prompt FASTA files from Step 4
-#   <output_dir>:  directory for ColabFold output (PDBs and logs)
-#   <prefix>:      filename prefix used in Step 4 (e.g. SH3_prompts)
+#   <fasta_dir>: directory containing per-prompt FASTA files (prompt_0.fasta,
+#                prompt_1.fasta, ...) from Step 3 --fasta output
+#   <output_dir>: directory for ColabFold output (PDBs and logs)
 #
 # OUTPUT:
 #   <output_dir>/prompt_<i>/          (ColabFold PDB files and logs per prompt)
@@ -28,18 +28,17 @@
 set -euo pipefail
 
 # --- Validate args ---
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <samples_dir> <output_dir> <prefix>"
-    echo "Example: $0 outputs/SH3/samples outputs/SH3/structures SH3_prompts"
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <fasta_dir> <output_dir>"
+    echo "Example: $0 outputs/SH3/samples outputs/SH3/structures"
     exit 1
 fi
 
-samples_dir=$1
+fasta_dir=$1
 outdir=$2
-prefix=$3
 
-if [ ! -d "${samples_dir}" ]; then
-    echo "Error: Samples directory not found: ${samples_dir}"
+if [ ! -d "${fasta_dir}" ]; then
+    echo "Error: FASTA directory not found: ${fasta_dir}"
     exit 1
 fi
 
@@ -60,17 +59,16 @@ mkdir -p "${outdir}"
 echo "============================================="
 echo "Step 5: Structure Prediction with ColabFold"
 echo "============================================="
-echo "Samples dir: ${samples_dir}"
-echo "Output dir:  ${outdir}"
-echo "Prefix:      ${prefix}"
+echo "FASTA dir:  ${fasta_dir}"
+echo "Output dir: ${outdir}"
 echo ""
 
 # --- Discover FASTA files ---
-fasta_files=$(ls "${samples_dir}/${prefix}_prompt_"*"_samples.fasta" 2>/dev/null | sort -V)
+fasta_files=$(ls "${fasta_dir}/"prompt_*".fasta" 2>/dev/null | sort -V)
 nfasta=$(echo "${fasta_files}" | wc -l)
 
 if [ -z "${fasta_files}" ]; then
-    echo "Error: No FASTA files found matching: ${samples_dir}/${prefix}_prompt_*_samples.fasta"
+    echo "Error: No FASTA files found matching: ${fasta_dir}/prompt_*.fasta"
     exit 1
 fi
 
@@ -82,9 +80,9 @@ echo "[1/2] Running ColabFold structure prediction..."
 count=0
 for fasta in ${fasta_files}; do
     count=$((count + 1))
-    # Extract prompt index from filename (e.g. prefix_prompt_3_samples.fasta → 3)
+    # Extract prompt index from filename (e.g. prompt_3.fasta → 3)
     fname=$(basename "${fasta}")
-    prompt_idx=$(echo "${fname}" | sed -E "s/${prefix}_prompt_([0-9]+)_samples\.fasta/\1/")
+    prompt_idx=$(echo "${fname}" | sed -E "s/prompt_([0-9]+)\.fasta/\1/")
     prompt_outdir="${outdir}/prompt_${prompt_idx}"
     mkdir -p "${prompt_outdir}"
 

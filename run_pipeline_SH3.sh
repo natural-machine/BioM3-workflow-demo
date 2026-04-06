@@ -5,9 +5,10 @@
 #
 # Analysis Pipeline — SH3 Example
 #
-# Runs the post-generation analysis pipeline (Steps 4-8) starting from a
-# ProteoScribe .pt output file. Copy this script, edit the variables below,
-# and run it for your own protein family.
+# Runs the post-generation analysis pipeline (Steps 5-8). FASTA files must
+# already exist in SAMPLES_DIR from a prior Step 3 run with --fasta
+# --fasta_merge --fasta_dir, or from the standalone 04_samples_to_fasta.sh
+# utility.
 #
 # Environments are activated automatically for each step. Set the
 # environment names (conda) or paths (venv) in the USER CONFIGURATION
@@ -20,9 +21,6 @@
 set -euo pipefail
 
 # ========================== USER CONFIGURATION ==============================
-
-# --- Input ---
-PT_FILE="outputs/SH3/generation/SH3_prompts.ProteoScribe_output.pt"
 
 # --- Output directories ---
 OUTDIR="outputs/SH3_v2"
@@ -37,7 +35,7 @@ BLAST_DB="swissprot"       # "swissprot" (default), "pdbaa", or path to local DB
 BLAST_THREADS=16           # threads for local searches
 
 # --- Environments (conda env name or path to venv) ---
-ENV_BIOM3="biom3-env"      # Steps 4, 8  (e.g. "biom3-env" or "/path/to/biom3-venv")
+ENV_BIOM3="biom3-env"      # Step 8  (e.g. "biom3-env" or "/path/to/biom3-venv")
 ENV_COLABFOLD="colabfold"  # Step 5
 ENV_BLAST="blast-env"      # Step 6
 
@@ -57,31 +55,17 @@ activate_env() {
     fi
 }
 
-# Derive prefix from the .pt filename
-fname=$(basename "${PT_FILE}")
-if [[ "${fname}" == *.ProteoScribe_output.pt ]]; then
-    PREFIX="${fname%.ProteoScribe_output.pt}"
-else
-    PREFIX="${fname%.pt}"
-fi
-
-# ---------- Step 4: Convert to FASTA ----------
-activate_env "${ENV_BIOM3}"
-echo ""
-echo ">>> Step 4: Convert to FASTA (env: ${ENV_BIOM3})"
-./pipeline/04_samples_to_fasta.sh "${PT_FILE}" "${SAMPLES_DIR}"
-
 # ---------- Step 5: ColabFold Structure Prediction ----------
 activate_env "${ENV_COLABFOLD}"
 echo ""
 echo ">>> Step 5: ColabFold Structure Prediction (env: ${ENV_COLABFOLD})"
-./pipeline/05_colabfold.sh "${SAMPLES_DIR}" "${STRUCTURES_DIR}" "${PREFIX}"
+./pipeline/05_colabfold.sh "${SAMPLES_DIR}" "${STRUCTURES_DIR}"
 
 # ---------- Step 6: BLAST Search ----------
 activate_env "${ENV_BLAST}"
 echo ""
 echo ">>> Step 6: BLAST Search (env: ${ENV_BLAST})"
-FASTA_FILE="${SAMPLES_DIR}/generated_seqs_allprompts.fasta"
+FASTA_FILE="${SAMPLES_DIR}/all_sequences.fasta"
 ./pipeline/06_blast_search.sh "${FASTA_FILE}" "${BLAST_DIR}" \
     --db "${BLAST_DB}" --threads "${BLAST_THREADS}"
 

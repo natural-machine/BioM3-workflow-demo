@@ -6,7 +6,7 @@ Store session notes in docs/.claude_sessions/
 
 ## Project overview
 
-BioM3-workflow-demo demonstrates the BioM3 finetuning and sequence generation workflow. It provides an 8-step pipeline: embedding, finetuning, generation, FASTA conversion, structure prediction (ColabFold), BLAST search, structure comparison, and result plotting. Depends on the BioM3-dev Python package for core functionality.
+BioM3-workflow-demo demonstrates the BioM3 finetuning and sequence generation workflow. It provides a 9-step pipeline: embedding, finetuning, generation (with FASTA output), structure prediction (ColabFold), BLAST search, structure fetching, structure comparison, result plotting, and an interactive web app. Depends on the BioM3-dev Python package for core functionality.
 
 ## Ecosystem context
 
@@ -24,9 +24,9 @@ Version compatibility with BioM3-dev is tracked in [SYNC_LOG.md](SYNC_LOG.md).
 ## Repository layout
 
 ```
-pipeline/           # Step scripts (01_embedding.sh through 08_plot_results.sh)
+pipeline/           # Step scripts (01_embedding.sh through 09_webapp.sh)
 scripts/            # Helper scripts (sync, setup)
-configs/            # JSON model configs + shell training configs
+configs/            # JSON model/training configs + TOML pipeline configs
 data/               # Input CSVs and intermediate data (gitignored)
 weights/            # Symlinked model weights from BioM3-data-share (gitignored)
 outputs/            # Pipeline outputs per step (gitignored)

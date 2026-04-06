@@ -3,168 +3,120 @@
 # Step 2: Finetune ProteoScribe
 #
 # Finetunes the pretrained ProteoScribe base model on the HDF5 dataset
-# produced by Step 1. Loads ProteoScribe_epoch200.pth, freezes most of
-# the network, and trains the last N transformer blocks/layers.
+# produced by Step 1. Uses a JSON training config for all hyperparameters
+# and model architecture settings.
 #
 # USAGE:
-#   ./pipeline/02_finetune.sh <hdf5_file> <output_dir> [epochs]
+#   ./pipeline/02_finetune.sh <hdf5_file> <output_dir> [epochs] [options]
+#
+# OPTIONS:
+#   --config PATH       JSON training config (default: configs/stage3_config_finetune.json)
 #
 # EXAMPLE:
 #   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning
-#   ./pipeline/02_finetune.sh outputs/CM/embeddings/CM_dataset.compiled_emb.hdf5 outputs/CM/finetuning 50
+#   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning 50
+#   ./pipeline/02_finetune.sh outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning \
+#       --config configs/stage3_config_finetune.json
 #
 # INPUT:
 #   <hdf5_file>: compiled embeddings from Step 1
 #
 # OUTPUT:
-#   Checkpoints and logs in <output_dir>/
+#   checkpoints/<run_id>/   — model weights and checkpoints
+#   runs/<run_id>/          — logs, artifacts, metrics
 #=============================================================================
 
 set -euo pipefail
 
-# --- Validate args ---
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
-    echo "Usage: $0 <hdf5_file> <output_dir> [epochs]"
+# --- Validate positional args ---
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <hdf5_file> <output_dir> [epochs] [--config PATH]"
     echo "Example: $0 outputs/SH3/embeddings/SH3_dataset.compiled_emb.hdf5 outputs/SH3/finetuning 50"
     exit 1
 fi
 
 hdf5_file=$1
 outdir=$2
+shift 2
+
+# Optional positional epoch arg
+epochs=""
+if [ "$#" -gt 0 ] && [[ "$1" != --* ]]; then
+    epochs="$1"
+    shift
+fi
+
+# --- Parse optional flags ---
+config_path=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --config)
+            config_path="$2"
+            shift 2
+            ;;
+        *)
+            echo "Error: Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# --- Paths ---
+projdir=$(cd "$(dirname "$0")/.." && pwd)
+cd ${projdir}
+
+config_path="${config_path:-configs/stage3_config_finetune.json}"
+device="${BIOM3_DEVICE:-cuda}"
 
 if [ ! -f "${hdf5_file}" ]; then
     echo "Error: HDF5 file not found: ${hdf5_file}"
     exit 1
 fi
 
-# --- Paths ---
-projdir=$(cd "$(dirname "$0")/.." && pwd)
-cd ${projdir}
+if [ ! -f "${config_path}" ]; then
+    echo "Error: Config file not found: ${config_path}"
+    exit 1
+fi
 
-# Source finetuning config (provides defaults for all hyperparameters)
-source configs/config_finetune.sh
-
-# Override training data with the specified HDF5 file
-swissprot_data_root="${hdf5_file}"
-
-# Override epochs if provided
-epochs=${3:-${epochs}}
-
-# --- Spark hardware settings ---
-num_nodes=1
-gpu_devices=1
-device=cuda
-
-# --- Finetuning settings ---
-pretrained_weights="./weights/ProteoScribe/ProteoScribe_epoch200.pth"
-finetune_last_n_blocks=1
-finetune_last_n_layers=1
-resume_from_checkpoint=None
-
-# --- Output paths ---
-output_hist_folder="${outdir}"
-tb_logger_path="${outdir}"
-tb_logger_folder="checkpoints"
-
-# --- Version name ---
+# --- Run ID ---
 datetime=$(date +%Y%m%d_%H%M%S)
-version_name="finetune_n${num_nodes}_d${gpu_devices}_e${epochs}_V${datetime}"
+run_id="finetune_e${epochs:-default}_V${datetime}"
 
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
-
-# --- Logging setup ---
-mkdir -p "${outdir}/logs"
-log_fpath="${outdir}/logs/${version_name}.o"
 
 echo "============================================="
 echo "Step 2: Finetune ProteoScribe"
 echo "============================================="
-echo "Base model:       ${pretrained_weights}"
-echo "Training data:    ${swissprot_data_root}"
-echo "Output dir:       ${outdir}"
-echo "Epochs:           ${epochs}"
-echo "Unfreeze blocks:  ${finetune_last_n_blocks}"
-echo "Unfreeze layers:  ${finetune_last_n_layers}"
-echo "Device:           ${device}"
-echo "Version:          ${version_name}"
-echo "Log file:         ${log_fpath}"
+echo "Config:         ${config_path}"
+echo "Training data:  ${hdf5_file}"
+echo "Output dir:     ${outdir}"
+if [ -n "${epochs}" ]; then echo "Epochs:         ${epochs}"; fi
+echo "Device:         ${device}"
+echo "Run ID:         ${run_id}"
 echo ""
 echo "Starting finetuning..."
 echo ""
 
-biom3_pretrain_stage3 \
-    --output_hist_folder ${output_hist_folder} \
-    --output_folder ${output_folder} \
-    --save_hist_path ${save_hist_path} \
-    --model_option ${model_option} \
-    --swissprot_data_root ${swissprot_data_root} \
-    --pfam_data_root ${pfam_data_root} \
-    --diffusion_steps ${diffusion_steps} \
-    --seed ${seed} \
-    --batch-size ${batch_size} \
-    --warmup-steps ${warmup_steps} \
-    --image-size ${image_size} \
-    --lr ${lr} \
-    --scale_learning_rate ${scale_learning_rate} \
-    --weight-decay ${weight_decay} \
-    --ema_inv_gamma ${ema_inv_gamma} \
-    --ema_max_value ${ema_max_value} \
-    --precision ${precision} \
-    --device ${device} \
-    --transformer_dim ${transformer_dim} \
-    --transformer_heads ${transformer_heads} \
-    --num_classes ${num_classes} \
-    --task ${task} \
-    --num_y_class_labels ${num_y_class_labels} \
-    --enter_eval ${enter_eval} \
-    --transformer_depth ${transformer_depth} \
-    --choose_optim ${choose_optim} \
-    --epochs ${epochs} \
-    --acc_grad_batches ${acc_grad_batches} \
-    --gpu_devices ${gpu_devices} \
-    --num_nodes ${num_nodes} \
-    --version_name ${version_name} \
-    --scheduler_gamma ${scheduler_gamma} \
-    --text_emb_dim ${text_emb_dim} \
-    --sequence_keyname ${sequence_keyname} \
-    --facilitator ${facilitator} \
-    --tb_logger_path ${tb_logger_path} \
-    --tb_logger_folder ${tb_logger_folder} \
-    --resume_from_checkpoint ${resume_from_checkpoint} \
-    --valid_size ${valid_size} \
-    --max_steps ${max_steps} \
-    --log_every_n_steps ${log_every_n_steps} \
-    --val_check_interval ${val_check_interval} \
-    --limit_val_batches ${limit_val_batches} \
-    --start_pfam_trainer ${start_pfam_trainer} \
-    --num_workers ${num_workers} \
-    --wandb ${wandb} \
-    --wandb_entity ${wandb_entity} \
-    --wandb_project "${wandb_project}" \
-    --wandb_name ${version_name} \
-    --finetune True \
-    --pretrained_weights ${pretrained_weights} \
-    --finetune_last_n_blocks ${finetune_last_n_blocks} \
-    --finetune_last_n_layers ${finetune_last_n_layers} \
-    --finetune_output_layers ${finetune_output_layers} \
-    --wandb_logging_dir ${wandb_logging_dir} \
-    --wandb_tags ${wandb_tags} \
-    --ema_power ${ema_power} \
-    --num_steps ${num_steps} \
-    --actnorm ${actnorm} \
-    --perm_channel ${perm_channel} \
-    --perm_length ${perm_length} \
-    --input_dp_rate ${input_dp_rate} \
-    --transformer_blocks ${transformer_blocks} \
-    --transformer_dropout ${transformer_dropout} \
-    --transformer_reversible ${transformer_reversible} \
-    --transformer_local_heads ${transformer_local_heads} \
-    --transformer_local_size ${transformer_local_size} \
-2>&1 | tee ${log_fpath}
+# Build CLI args — config provides all hyperparameters,
+# CLI overrides only the per-run values.
+cli_args=(
+    --config_path "${config_path}"
+    --primary_data_path "${hdf5_file}"
+    --output_root "${outdir}"
+    --run_id "${run_id}"
+    --device "${device}"
+)
+
+if [ -n "${epochs}" ]; then
+    cli_args+=(--epochs "${epochs}")
+fi
+
+biom3_pretrain_stage3 "${cli_args[@]}"
 
 echo ""
 echo "============================================="
 echo "Finetuning complete."
-echo "Log:         ${log_fpath}"
-echo "Checkpoints: ${tb_logger_path}/${tb_logger_folder}/${version_name}/"
+echo "Checkpoints: ${outdir}/checkpoints/${run_id}/"
+echo "Run logs:    ${outdir}/runs/${run_id}/"
 echo "============================================="

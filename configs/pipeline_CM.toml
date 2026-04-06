@@ -2,7 +2,7 @@
 # Run: python run_pipeline.py configs/pipeline_CM.toml
 
 [pipeline]
-steps = [1, 2, 3, 4, 5, 6, "6b", 7, 8]
+steps = [1, 2, 3, 5, 6, "6b", 7, 8]
 
 [environments]
 biom3     = "biom3-env"
@@ -14,6 +14,9 @@ output_dir  = "outputs/CM"
 input_csv   = "data/CM/FINAL_CM_all_dataset_with_prompts.csv"
 prompts_csv = "data/CM/CM_prompts.csv"
 epochs      = 50
+
+[finetuning]
+config = "configs/stage3_config_finetune.json"
 
 [blast]
 db      = "swissprot"

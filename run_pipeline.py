@@ -23,26 +23,28 @@ STEPS = {
     "1":  ("pipeline/01_embedding.sh",            "biom3"),
     "2":  ("pipeline/02_finetune.sh",              "biom3"),
     "3":  ("pipeline/03_generate.sh",              "biom3"),
-    "4":  ("pipeline/04_samples_to_fasta.sh",      "biom3"),
     "5":  ("pipeline/05_colabfold.sh",             "colabfold"),
     "6":  ("pipeline/06_blast_search.sh",          "blast"),
     "6b": ("pipeline/06b_fetch_hit_structures.sh", None),
     "7":  ("pipeline/07_compare_structures.sh",    "biom3"),
     "8":  ("pipeline/08_plot_results.sh",           "biom3"),
+    "9":  ("pipeline/09_webapp.sh",                "biom3"),
 }
 
-STEP_ORDER = ["1", "2", "3", "4", "5", "6", "6b", "7", "8"]
+# Step 9 (webapp) is interactive/blocking — excluded from default order.
+# Use --steps 9 to launch it explicitly.
+STEP_ORDER = ["1", "2", "3", "5", "6", "6b", "7", "8"]
 
 STEP_NAMES = {
     "1":  "Embedding",
     "2":  "Finetuning",
     "3":  "Generation",
-    "4":  "Convert to FASTA",
     "5":  "ColabFold Structure Prediction",
     "6":  "BLAST Search",
     "6b": "Fetch Reference Structures",
     "7":  "Structure Comparison (TMalign)",
     "8":  "Plot Results",
+    "9":  "Web App",
 }
 
 
@@ -74,17 +76,6 @@ def derive_paths(cfg: dict) -> dict:
     input_prefix = Path(input_csv).stem if input_csv else ""
     prompts_prefix = Path(prompts_csv).stem if prompts_csv else ""
 
-    # Derive pt_file prefix for Step 4
-    pt_file = paths.get("pt_file", "")
-    if pt_file:
-        fname = Path(pt_file).name
-        if fname.endswith(".ProteoScribe_output.pt"):
-            pt_prefix = fname.removesuffix(".ProteoScribe_output.pt")
-        else:
-            pt_prefix = fname.removesuffix(".pt")
-    else:
-        pt_prefix = prompts_prefix
-
     d = {
         "output_dir":       outdir,
         "embeddings_dir":   f"{outdir}/embeddings",
@@ -99,7 +90,6 @@ def derive_paths(cfg: dict) -> dict:
         "prompts_csv":      prompts_csv,
         "input_prefix":     input_prefix,
         "prompts_prefix":   prompts_prefix,
-        "pt_prefix":        pt_prefix,
     }
 
     # HDF5 from Step 1
@@ -120,8 +110,8 @@ def derive_paths(cfg: dict) -> dict:
     # Epochs (optional override for Step 2)
     d["epochs"] = paths.get("epochs", "")
 
-    # FASTA from Step 4
-    d["fasta_file"] = f"{d['samples_dir']}/generated_seqs_allprompts.fasta"
+    # FASTA from Step 3 (--fasta_merge output)
+    d["fasta_file"] = f"{d['samples_dir']}/all_sequences.fasta"
 
     # Reference structures from Step 6/6b
     d["reference_dir"] = f"{d['blast_dir']}/reference_structures"
@@ -160,9 +150,12 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
             return [d["input_csv"], d["embeddings_dir"]]
 
         case "2":
+            ft_cfg = cfg.get("finetuning", {})
             args = [d["hdf5_file"], d["finetuning_dir"]]
             if d["epochs"]:
                 args.append(str(d["epochs"]))
+            if ft_cfg.get("config"):
+                args += ["--config", ft_cfg["config"]]
             return args
 
         case "3":
@@ -176,6 +169,9 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                     "Set paths.model_weights in the config."
                 )
             args = [weights, d["prompts_csv"], d["generation_dir"]]
+            # Always produce FASTA output for downstream steps
+            args += ["--fasta", "--fasta_merge",
+                     "--fasta_dir", d["samples_dir"]]
             if gen_cfg.get("unmasking_order"):
                 args += ["--unmasking_order", gen_cfg["unmasking_order"]]
             if gen_cfg.get("token_strategy"):
@@ -186,13 +182,20 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                 ]
             if gen_cfg.get("animate_replicas"):
                 args += ["--animate_replicas", str(gen_cfg["animate_replicas"])]
+            if gen_cfg.get("animation_dir"):
+                args += ["--animation_dir", gen_cfg["animation_dir"]]
+            if gen_cfg.get("animation_style"):
+                args += ["--animation_style", gen_cfg["animation_style"]]
+            if gen_cfg.get("animation_metrics"):
+                args += ["--animation_metrics"] + [
+                    str(x) for x in gen_cfg["animation_metrics"]
+                ]
+            if gen_cfg.get("store_probabilities"):
+                args += ["--store_probabilities"]
             return args
 
-        case "4":
-            return [d["pt_file"], d["samples_dir"]]
-
         case "5":
-            return [d["samples_dir"], d["structures_dir"], d["pt_prefix"]]
+            return [d["samples_dir"], d["structures_dir"]]
 
         case "6":
             db = blast_cfg.get("db", "swissprot")
@@ -234,6 +237,13 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
             args = [d["results_csv"], d["images_dir"]]
             if Path(d["colabfold_csv"]).exists() or "5" in cfg.get("pipeline", {}).get("steps", []):
                 args += ["--colabfold-csv", d["colabfold_csv"]]
+            return args
+
+        case "9":
+            webapp_cfg = cfg.get("webapp", {})
+            args = []
+            if webapp_cfg.get("port"):
+                args += ["--port", str(webapp_cfg["port"])]
             return args
 
         case _:
@@ -327,8 +337,10 @@ def main():
         raw_steps = cfg.get("pipeline", {}).get("steps", STEP_ORDER)
         steps = [normalize_step_id(s) for s in raw_steps]
 
-    # Sort steps by canonical order
-    steps = [s for s in STEP_ORDER if s in steps]
+    # Sort steps by canonical order, then append any extras (e.g. step 9)
+    ordered = [s for s in STEP_ORDER if s in steps]
+    extras = [s for s in steps if s not in STEP_ORDER]
+    steps = ordered + extras
 
     print()
     print("BioM3 Pipeline Runner")

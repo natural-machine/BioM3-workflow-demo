@@ -24,17 +24,17 @@
 #   --no-download-pdbs     Skip downloading PDB files for hits
 #
 # EXAMPLE (remote SwissProt search, default):
-#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/all_sequences.fasta outputs/SH3/blast
 #
 # EXAMPLE (remote PDB search with structure downloads):
-#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db pdbaa
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/all_sequences.fasta outputs/SH3/blast --db pdbaa
 #
 # EXAMPLE (local SwissProt or NR search):
-#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/swissprot_blast/swissprot --threads 16
-#   ./pipeline/06_blast_search.sh outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast --db /path/to/nr_blast/nr --threads 16
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/all_sequences.fasta outputs/SH3/blast --db /path/to/swissprot_blast/swissprot --threads 16
+#   ./pipeline/06_blast_search.sh outputs/SH3/samples/all_sequences.fasta outputs/SH3/blast --db /path/to/nr_blast/nr --threads 16
 #
 # INPUT:
-#   <fasta_file>: concatenated FASTA of generated sequences from Step 4
+#   <fasta_file>: concatenated FASTA of generated sequences (from Step 3 --fasta_merge)
 #
 # OUTPUT:
 #   <output_dir>/blast_hit_results.tsv
@@ -57,7 +57,7 @@ if [ "$#" -lt 2 ]; then
     echo "  --max-targets N        Max target sequences (default: 5)"
     echo "  --no-download-pdbs     Skip downloading PDB files"
     echo ""
-    echo "Example: $0 outputs/SH3/samples/generated_seqs_allprompts.fasta outputs/SH3/blast"
+    echo "Example: $0 outputs/SH3/samples/all_sequences.fasta outputs/SH3/blast"
     exit 1
 fi
 
