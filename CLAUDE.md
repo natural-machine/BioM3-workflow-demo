@@ -8,6 +8,10 @@ Store session notes in docs/.claude_sessions/
 
 BioM3-workflow-demo demonstrates the BioM3 finetuning and sequence generation workflow. It provides an 8-step pipeline: embedding, finetuning, generation (with FASTA output), structure prediction (ColabFold), BLAST search, structure fetching, structure comparison, result plotting, and an interactive web app. Depends on the BioM3-dev Python package for core functionality.
 
+## Versioning
+
+Version is defined in the `VERSION` file at the repo root (PEP 440 format, e.g. `0.1.0a1`). This is the single source of truth — read by `run_pipeline.py` and exported as `BIOM3_WORKFLOW_VERSION` by `environment.sh`. Cross-repo compatibility with BioM3-dev is tracked in `SYNC_LOG.md`.
+
 ## Ecosystem context
 
 BioM3-workflow-demo is a demonstration repo in the BioM3 multi-repo ecosystem. See [docs/biom3_ecosystem.md](docs/biom3_ecosystem.md) for full details.

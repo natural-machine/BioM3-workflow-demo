@@ -4,6 +4,9 @@
 # Common variables are set unconditionally. Machine-specific variables are
 # added based on hostname detection (Polaris, Aurora, DGX Spark).
 
+# --- Version ---
+export BIOM3_WORKFLOW_VERSION=$(cat "$(dirname "${BASH_SOURCE[0]}")/VERSION")
+
 # --- Common (all machines) ---
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 

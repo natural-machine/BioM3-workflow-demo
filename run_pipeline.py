@@ -17,6 +17,13 @@ import sys
 import tomllib
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+
+def get_version() -> str:
+    return (SCRIPT_DIR / "VERSION").read_text().strip()
+
+
 # Step ID → (script path, environment key from [environments])
 # Environment key of None means no activation needed.
 STEPS = {
@@ -313,6 +320,10 @@ def main():
         description="Config-driven pipeline runner for BioM3",
         usage="python run_pipeline.py <config.toml> [--steps ...] [--dry-run]",
     )
+    parser.add_argument(
+        "--version", action="version",
+        version=f"%(prog)s {get_version()}",
+    )
     parser.add_argument("config", type=Path, help="Path to TOML config file")
     parser.add_argument(
         "--steps", nargs="+", default=None,
@@ -343,7 +354,7 @@ def main():
     steps = ordered + extras
 
     print()
-    print("BioM3 Pipeline Runner")
+    print(f"BioM3 Pipeline Runner v{get_version()}")
     print("=" * 60)
     print(f"  Config:     {args.config}")
     print(f"  Output dir: {d['output_dir']}")
