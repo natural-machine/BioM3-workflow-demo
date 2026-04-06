@@ -90,7 +90,7 @@ conda create -n biom3-env python=3.12
 conda activate biom3-env
 python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
 python -m pip install -r requirements/spark.txt    # or polaris.txt, aurora.txt
-python -m pip install git+https://github.com/addison-nm/BioM3-dev.git
+python -m pip install git+https://github.com/addison-nm/BioM3-dev.git@v0.1.0a1
 ```
 
 ### 3. Optional: ColabFold and BLAST environments

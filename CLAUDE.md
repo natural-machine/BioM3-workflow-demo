@@ -43,7 +43,7 @@ VERSION             # Single-source version (PEP 440)
 
 ## Building and running
 
-Requires BioM3-dev installed (`pip install git+https://github.com/addison-nm/BioM3-dev.git` or `pip install -e /path/to/BioM3-dev`). Source `environment.sh` before running pipeline steps.
+Requires BioM3-dev installed (`pip install git+https://github.com/addison-nm/BioM3-dev.git@v0.1.0a1` or `pip install -e /path/to/BioM3-dev`). Source `environment.sh` before running pipeline steps.
 
 ```bash
 source environment.sh
