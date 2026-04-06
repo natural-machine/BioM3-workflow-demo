@@ -83,13 +83,13 @@ git clone <repo-url> && cd BioM3-workflow-demo
 
 ### 2. Create environment and install BioM3
 
-Follow the setup instructions for your machine in the BioM3-dev repository. For the DGX Spark:
+Follow the setup instructions for your machine in the BioM3-dev repository. Machine-specific requirements are in `requirements/`:
 
 ```bash
 conda create -n biom3-env python=3.12
 conda activate biom3-env
 python -m pip install torch==2.8 torchvision --index-url https://download.pytorch.org/whl/cu129
-python -m pip install -r requirements_spark.txt
+python -m pip install -r requirements/spark.txt    # or polaris.txt, aurora.txt
 python -m pip install git+https://github.com/addison-nm/BioM3-dev.git
 ```
 
