@@ -1,6 +1,6 @@
 #!/bin/bash
 #=============================================================================
-# Step 5: Structure Prediction with ColabFold
+# Step 4: Structure Prediction with ColabFold
 #
 # Runs ColabFold (AlphaFold2) structure prediction on per-prompt FASTA files
 # produced by Step 3 (with --fasta). After all predictions complete, parses
@@ -57,7 +57,7 @@ cd ${projdir}
 mkdir -p "${outdir}"
 
 echo "============================================="
-echo "Step 5: Structure Prediction with ColabFold"
+echo "Step 4: Structure Prediction with ColabFold"
 echo "============================================="
 echo "FASTA dir:  ${fasta_dir}"
 echo "Output dir: ${outdir}"

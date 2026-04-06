@@ -205,52 +205,52 @@ outputs/CM/samples/                           # FASTA output (--fasta --fasta_me
     all_sequences.fasta                       # All prompts merged
 ```
 
-## Steps 5-8: Analysis Pipeline
+## Steps 4-7: Analysis Pipeline
 
 After generation, run the analysis pipeline:
 
 ```bash
-python run_pipeline.py configs/pipeline_CM.toml --steps 5 6 6b 7 8
+python run_pipeline.py configs/pipeline_CM.toml --steps 4 5 5b 6 7
 ```
 
 Or run each step individually:
 
-### Step 5: Structure Prediction (ColabFold)
+### Step 4: Structure Prediction (ColabFold)
 
 ```bash
 conda activate colabfold
-./pipeline/05_colabfold.sh \
+./pipeline/04_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures
 ```
 
-### Step 6: BLAST Search
+### Step 5: BLAST Search
 
 ```bash
 conda activate blast-env
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/CM/samples/all_sequences.fasta \
     outputs/CM/blast
 ```
 
 Defaults to a remote SwissProt search. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or pass a local path (e.g. `--db /path/to/BioM3-data-share/databases/nr_blast/nr`) for a local search.
 
-### Step 6b: Fetch Reference Structures
+### Step 5b: Fetch Reference Structures
 
 For non-pdbaa databases (SwissProt, NR, etc.), fetch 3D structures for BLAST hits. Downloads experimental structures from RCSB when available, falling back to AlphaFold DB predictions.
 
 ```bash
-./pipeline/06b_fetch_hit_structures.sh \
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/blast
 ```
 
 Outputs `reference_structures/` (PDB files named by UniProt accession) and `structure_manifest.tsv` (source metadata per accession).
 
-### Step 7: Structure Comparison (TMalign)
+### Step 6: Structure Comparison (TMalign)
 
 ```bash
-./pipeline/07_compare_structures.sh \
+./pipeline/06_compare_structures.sh \
     outputs/CM/structures/colabfold_results.csv \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/structures \
@@ -258,21 +258,21 @@ Outputs `reference_structures/` (PDB files named by UniProt accession) and `stru
     outputs/CM/comparison
 ```
 
-### Step 8: Plot Results
+### Step 7: Plot Results
 
 ```bash
-./pipeline/08_plot_results.sh \
+./pipeline/07_plot_results.sh \
     outputs/CM/comparison/results.csv \
     outputs/CM/images \
     --colabfold-csv outputs/CM/structures/colabfold_results.csv
 ```
 
-### Step 9: Web App
+### Step 8: Web App
 
 Launch the interactive web app to explore pipeline outputs — view and align structures, color residues by metrics (pLDDT, conservation), visualize diffusion unmasking order, and run BLAST searches.
 
 ```bash
-./pipeline/09_webapp.sh
+./pipeline/08_webapp.sh
 ```
 
 Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_data_dirs.json`. Use `--port` to change the port.
@@ -300,37 +300,37 @@ conda activate biom3-env
     data/CM/CM_prompts.csv \
     outputs/CM/generation
 
-# 5. ColabFold (requires colabfold env)
+# 4. ColabFold (requires colabfold env)
 conda activate colabfold
-./pipeline/05_colabfold.sh \
+./pipeline/04_colabfold.sh \
     outputs/CM/samples \
     outputs/CM/structures
 
-# 6. BLAST (requires blast-env)
+# 5. BLAST (requires blast-env)
 conda activate blast-env
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/CM/samples/all_sequences.fasta \
     outputs/CM/blast
 
-# 6b. Fetch reference structures (for SwissProt/non-pdbaa hits)
-./pipeline/06b_fetch_hit_structures.sh \
+# 5b. Fetch reference structures (for SwissProt/non-pdbaa hits)
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/blast
 
-# 7. TMalign comparison
-./pipeline/07_compare_structures.sh \
+# 6. TMalign comparison
+./pipeline/06_compare_structures.sh \
     outputs/CM/structures/colabfold_results.csv \
     outputs/CM/blast/blast_hit_results.tsv \
     outputs/CM/structures \
     outputs/CM/blast/reference_structures \
     outputs/CM/comparison
 
-# 8. Plotting
-./pipeline/08_plot_results.sh \
+# 7. Plotting
+./pipeline/07_plot_results.sh \
     outputs/CM/comparison/results.csv \
     outputs/CM/images \
     --colabfold-csv outputs/CM/structures/colabfold_results.csv
 
-# 9. Web app (interactive exploration)
-./pipeline/09_webapp.sh
+# 8. Web app (interactive exploration)
+./pipeline/08_webapp.sh
 ```

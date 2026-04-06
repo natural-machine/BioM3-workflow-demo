@@ -6,7 +6,7 @@ Store session notes in docs/.claude_sessions/
 
 ## Project overview
 
-BioM3-workflow-demo demonstrates the BioM3 finetuning and sequence generation workflow. It provides a 9-step pipeline: embedding, finetuning, generation (with FASTA output), structure prediction (ColabFold), BLAST search, structure fetching, structure comparison, result plotting, and an interactive web app. Depends on the BioM3-dev Python package for core functionality.
+BioM3-workflow-demo demonstrates the BioM3 finetuning and sequence generation workflow. It provides an 8-step pipeline: embedding, finetuning, generation (with FASTA output), structure prediction (ColabFold), BLAST search, structure fetching, structure comparison, result plotting, and an interactive web app. Depends on the BioM3-dev Python package for core functionality.
 
 ## Ecosystem context
 
@@ -24,7 +24,7 @@ Version compatibility with BioM3-dev is tracked in [SYNC_LOG.md](SYNC_LOG.md).
 ## Repository layout
 
 ```
-pipeline/           # Step scripts (01_embedding.sh through 09_webapp.sh)
+pipeline/           # Step scripts (01_embedding.sh through 08_webapp.sh)
 scripts/            # Helper scripts (sync, setup)
 configs/            # JSON model/training configs + TOML pipeline configs
 data/               # Input CSVs and intermediate data (gitignored)
@@ -47,7 +47,7 @@ python run_pipeline.py configs/pipeline_SH3.toml   # full pipeline
 ./pipeline/01_embedding.sh                          # individual step
 ```
 
-Steps 5-8 require separate conda environments (colabfold, blast-env). The pipeline runner handles environment activation.
+Steps 4-7 require separate conda environments (colabfold, blast-env). The pipeline runner handles environment activation.
 
 Weights and databases are symlinked from BioM3-data-share. See README.md for per-machine paths and sync instructions.
 

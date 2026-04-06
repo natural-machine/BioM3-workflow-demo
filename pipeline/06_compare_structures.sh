@@ -1,9 +1,9 @@
 #!/bin/bash
 #=============================================================================
-# Step 7: Structure Comparison with TMalign
+# Step 6: Structure Comparison with TMalign
 #
-# Compares ColabFold-predicted structures (Step 5) against BLAST reference
-# structures (Step 6) using TMalign. Produces a CSV of structural similarity
+# Compares ColabFold-predicted structures (Step 4) against BLAST reference
+# structures (Step 5) using TMalign. Produces a CSV of structural similarity
 # metrics (TM-score, RMSD, sequence identity) for each query-reference pair.
 #
 # Requires TMalign to be installed and on PATH.
@@ -20,8 +20,8 @@
 #       outputs/SH3/comparison
 #
 # INPUT:
-#   <colabfold_csv>:  colabfold_results.csv from Step 5 (maps query IDs to PDB filenames)
-#   <blast_tsv>:      blast_hit_results.tsv from Step 6 (query-reference pairs)
+#   <colabfold_csv>:  colabfold_results.csv from Step 4 (maps query IDs to PDB filenames)
+#   <blast_tsv>:      blast_hit_results.tsv from Step 5 (query-reference pairs)
 #   <structures_dir>: directory containing ColabFold prompt_*/ subdirectories
 #   <reference_dir>:  directory containing downloaded reference PDB files
 #
@@ -83,7 +83,7 @@ mkdir -p "${outdir}"
 mkdir -p "${logdir}"
 
 echo "============================================="
-echo "Step 7: Structure Comparison with TMalign"
+echo "Step 6: Structure Comparison with TMalign"
 echo "============================================="
 echo "ColabFold CSV:   ${colabfold_csv}"
 echo "BLAST TSV:       ${blast_tsv}"

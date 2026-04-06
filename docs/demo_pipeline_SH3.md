@@ -214,7 +214,7 @@ If you want to skip finetuning and generate sequences directly, pretrained SH3 w
     outputs/SH3/generation
 ```
 
-## Steps 5-8: Analysis Pipeline
+## Steps 4-7: Analysis Pipeline
 
 After generation, run the analysis pipeline to predict structures, search for homologs, and evaluate results:
 
@@ -222,46 +222,46 @@ After generation, run the analysis pipeline to predict structures, search for ho
 python run_pipeline.py configs/pipeline_SH3_analysis.toml
 ```
 
-This runs Steps 5 through 8 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
+This runs Steps 4 through 7 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
 
-### Step 5: Structure Prediction (ColabFold)
+### Step 4: Structure Prediction (ColabFold)
 
 ```bash
 conda activate colabfold
-./pipeline/05_colabfold.sh \
+./pipeline/04_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures
 ```
 
 Runs ColabFold on each per-prompt FASTA and produces `colabfold_results.csv` with pLDDT and pTM scores.
 
-### Step 6: BLAST Search
+### Step 5: BLAST Search
 
 ```bash
 conda activate blast-env
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 ```
 
-Defaults to a remote SwissProt search. Can run in parallel with Step 5. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or `--db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot` for a local SwissProt search. Use `--local` to force a local search by name.
+Defaults to a remote SwissProt search. Can run in parallel with Step 4. Use `--db pdbaa` for a PDB search (also downloads reference PDB files), or `--db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot` for a local SwissProt search. Use `--local` to force a local search by name.
 
-### Step 6b: Fetch Reference Structures
+### Step 5b: Fetch Reference Structures
 
 For non-pdbaa databases (SwissProt, NR, etc.), fetch 3D structures for BLAST hits. Downloads experimental structures from RCSB when available, falling back to AlphaFold DB predictions. If `../BioM3-data-share/databases/swissprot/uniprot_sprot.dat.gz` is present, PDB cross-references are resolved locally (no API calls needed for the lookup step).
 
 ```bash
-./pipeline/06b_fetch_hit_structures.sh \
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/blast
 ```
 
 Outputs `reference_structures/` (PDB files named by UniProt accession) and `structure_manifest.tsv` (source metadata per accession).
 
-### Step 7: Structure Comparison (TMalign)
+### Step 6: Structure Comparison (TMalign)
 
 ```bash
-./pipeline/07_compare_structures.sh \
+./pipeline/06_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
@@ -271,10 +271,10 @@ Outputs `reference_structures/` (PDB files named by UniProt accession) and `stru
 
 Compares predicted structures against BLAST reference structures using TMalign.
 
-### Step 8: Plot Results
+### Step 7: Plot Results
 
 ```bash
-./pipeline/08_plot_results.sh \
+./pipeline/07_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
@@ -282,12 +282,12 @@ Compares predicted structures against BLAST reference structures using TMalign.
 
 Generates strip plots for TM-score, RMSD, sequence identity, and pLDDT.
 
-### Step 9: Web App
+### Step 8: Web App
 
 Launch the interactive web app to explore pipeline outputs — view and align structures, color residues by metrics (pLDDT, conservation), visualize diffusion unmasking order, and run BLAST searches.
 
 ```bash
-./pipeline/09_webapp.sh
+./pipeline/08_webapp.sh
 ```
 
 Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_data_dirs.json`. Use `--port` to change the port.
@@ -315,38 +315,38 @@ conda activate biom3-env
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
 
-# Steps 5-8: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
-# 5. ColabFold (requires colabfold env)
+# Steps 4-7: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
+# 4. ColabFold (requires colabfold env)
 conda activate colabfold
-./pipeline/05_colabfold.sh \
+./pipeline/04_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures
 
-# 6. BLAST (requires blast-env)
+# 5. BLAST (requires blast-env)
 conda activate blast-env
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 
-# 6b. Fetch reference structures (for SwissProt/non-pdbaa hits)
-./pipeline/06b_fetch_hit_structures.sh \
+# 5b. Fetch reference structures (for SwissProt/non-pdbaa hits)
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/blast
 
-# 7. TMalign comparison
-./pipeline/07_compare_structures.sh \
+# 6. TMalign comparison
+./pipeline/06_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
     outputs/SH3/blast/reference_structures \
     outputs/SH3/comparison
 
-# 8. Plotting
-./pipeline/08_plot_results.sh \
+# 7. Plotting
+./pipeline/07_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
 
-# 9. Web app (interactive exploration)
-./pipeline/09_webapp.sh
+# 8. Web app (interactive exploration)
+./pipeline/08_webapp.sh
 ```

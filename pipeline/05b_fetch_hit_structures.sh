@@ -1,6 +1,6 @@
 #!/bin/bash
 #=============================================================================
-# Step 6b: Fetch Reference Structures for SwissProt BLAST Hits
+# Step 5b: Fetch Reference Structures for SwissProt BLAST Hits
 #
 # Resolves 3D structures for UniProt accessions found in BLAST results.
 # For each hit, tries to download an experimental PDB structure from RCSB,
@@ -12,7 +12,7 @@
 # UniProt REST API.
 #
 # Structures are saved as {accession}.pdb in <output_dir>/reference_structures/,
-# which integrates directly with Step 7 (07_compare_structures.sh).
+# which integrates directly with Step 6 (06_compare_structures.sh).
 #
 # USAGE:
 #   ./pipeline/06b_fetch_hit_structures.sh <blast_tsv> <output_dir> [options]
@@ -35,7 +35,7 @@
 #       outputs/SH3/blast --alphafold-only
 #
 # INPUT:
-#   <blast_tsv>: blast_hit_results.tsv from Step 6
+#   <blast_tsv>: blast_hit_results.tsv from Step 5
 #
 # OUTPUT:
 #   <output_dir>/reference_structures/   (downloaded PDB files)
@@ -111,7 +111,7 @@ if [ -z "${swissprot_dat}" ] && [ -z "${no_local_dat}" ] && [ -z "${alphafold_on
 fi
 
 echo "============================================="
-echo "Step 6b: Fetch Reference Structures"
+echo "Step 5b: Fetch Reference Structures"
 echo "============================================="
 echo "BLAST results: ${blast_tsv}"
 echo "Output dir:    ${outdir}"

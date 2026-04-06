@@ -1,6 +1,6 @@
 #!/bin/bash
 #=============================================================================
-# Step 9: Launch BioM3 Web App
+# Step 8: Launch BioM3 Web App
 #
 # Starts the BioM3 Streamlit web application for interactive exploration of
 # pipeline outputs: view and align 3D structures, color residues by metrics,
@@ -21,7 +21,7 @@
 #
 # REQUIRES:
 #   - BioM3-dev installed with app extras: pip install "biom3[app]"
-#   - Pipeline outputs in outputs/ (from Steps 1-8)
+#   - Pipeline outputs in outputs/ (from Steps 1-7)
 #=============================================================================
 
 set -euo pipefail
@@ -55,7 +55,7 @@ if [ ! -f "${config}" ]; then
 fi
 
 echo "============================================="
-echo "Step 9: BioM3 Web App"
+echo "Step 8: BioM3 Web App"
 echo "============================================="
 echo "Config:  ${config}"
 echo "URL:     http://localhost:${port:-8501}"

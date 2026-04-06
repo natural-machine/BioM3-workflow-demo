@@ -6,7 +6,7 @@ sequence, activating the correct conda/venv environment for each step.
 
 Usage:
     python run_pipeline.py <config.toml>
-    python run_pipeline.py <config.toml> --steps 4 5 6 6b 7 8
+    python run_pipeline.py <config.toml> --steps 4 5 5b 6 7
     python run_pipeline.py <config.toml> --dry-run
 """
 
@@ -23,28 +23,28 @@ STEPS = {
     "1":  ("pipeline/01_embedding.sh",            "biom3"),
     "2":  ("pipeline/02_finetune.sh",              "biom3"),
     "3":  ("pipeline/03_generate.sh",              "biom3"),
-    "5":  ("pipeline/05_colabfold.sh",             "colabfold"),
-    "6":  ("pipeline/06_blast_search.sh",          "blast"),
-    "6b": ("pipeline/06b_fetch_hit_structures.sh", None),
-    "7":  ("pipeline/07_compare_structures.sh",    "biom3"),
-    "8":  ("pipeline/08_plot_results.sh",           "biom3"),
-    "9":  ("pipeline/09_webapp.sh",                "biom3"),
+    "4":  ("pipeline/04_colabfold.sh",             "colabfold"),
+    "5":  ("pipeline/05_blast_search.sh",          "blast"),
+    "5b": ("pipeline/05b_fetch_hit_structures.sh", None),
+    "6":  ("pipeline/06_compare_structures.sh",    "biom3"),
+    "7":  ("pipeline/07_plot_results.sh",           "biom3"),
+    "8":  ("pipeline/08_webapp.sh",                "biom3"),
 }
 
-# Step 9 (webapp) is interactive/blocking — excluded from default order.
-# Use --steps 9 to launch it explicitly.
-STEP_ORDER = ["1", "2", "3", "5", "6", "6b", "7", "8"]
+# Step 8 (webapp) is interactive/blocking — excluded from default order.
+# Use --steps 8 to launch it explicitly.
+STEP_ORDER = ["1", "2", "3", "4", "5", "5b", "6", "7"]
 
 STEP_NAMES = {
     "1":  "Embedding",
     "2":  "Finetuning",
     "3":  "Generation",
-    "5":  "ColabFold Structure Prediction",
-    "6":  "BLAST Search",
-    "6b": "Fetch Reference Structures",
-    "7":  "Structure Comparison (TMalign)",
-    "8":  "Plot Results",
-    "9":  "Web App",
+    "4":  "ColabFold Structure Prediction",
+    "5":  "BLAST Search",
+    "5b": "Fetch Reference Structures",
+    "6":  "Structure Comparison (TMalign)",
+    "7":  "Plot Results",
+    "8":  "Web App",
 }
 
 
@@ -113,16 +113,16 @@ def derive_paths(cfg: dict) -> dict:
     # FASTA from Step 3 (--fasta_merge output)
     d["fasta_file"] = f"{d['samples_dir']}/all_sequences.fasta"
 
-    # Reference structures from Step 6/6b
+    # Reference structures from Step 5/5b
     d["reference_dir"] = f"{d['blast_dir']}/reference_structures"
 
-    # ColabFold results from Step 5
+    # ColabFold results from Step 4
     d["colabfold_csv"] = f"{d['structures_dir']}/colabfold_results.csv"
 
-    # BLAST results from Step 6
+    # BLAST results from Step 5
     d["blast_tsv"] = f"{d['blast_dir']}/blast_hit_results.tsv"
 
-    # TMalign results from Step 7
+    # TMalign results from Step 6
     d["results_csv"] = f"{d['comparison_dir']}/results.csv"
 
     return d
@@ -194,10 +194,10 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                 args += ["--store_probabilities"]
             return args
 
-        case "5":
+        case "4":
             return [d["samples_dir"], d["structures_dir"]]
 
-        case "6":
+        case "5":
             db = blast_cfg.get("db", "swissprot")
             threads = blast_cfg.get("threads", 16)
             args = [d["fasta_file"], d["blast_dir"], "--db", str(db)]
@@ -211,7 +211,7 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                 args += ["--max-targets", str(blast_cfg["max_targets"])]
             return args
 
-        case "6b":
+        case "5b":
             args = [d["blast_tsv"], d["blast_dir"]]
             fetch_cfg = cfg.get("fetch_structures", {})
             if fetch_cfg.get("swissprot_dat"):
@@ -224,7 +224,7 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                 args.append("--experimental-only")
             return args
 
-        case "7":
+        case "6":
             return [
                 d["colabfold_csv"],
                 d["blast_tsv"],
@@ -233,13 +233,13 @@ def build_step_args(step: str, cfg: dict, d: dict) -> list[str]:
                 d["comparison_dir"],
             ]
 
-        case "8":
+        case "7":
             args = [d["results_csv"], d["images_dir"]]
-            if Path(d["colabfold_csv"]).exists() or "5" in cfg.get("pipeline", {}).get("steps", []):
+            if Path(d["colabfold_csv"]).exists() or "4" in cfg.get("pipeline", {}).get("steps", []):
                 args += ["--colabfold-csv", d["colabfold_csv"]]
             return args
 
-        case "9":
+        case "8":
             webapp_cfg = cfg.get("webapp", {})
             args = []
             if webapp_cfg.get("port"):
@@ -277,11 +277,11 @@ def run_step(
     script, env_key = STEPS[step]
     env_name = cfg.get("environments", {}).get(env_key) if env_key else None
 
-    # Conditional 6b: skip for pdbaa (Step 6 handles PDB downloads directly)
-    if step == "6b":
+    # Conditional 5b: skip for pdbaa (Step 5 handles PDB downloads directly)
+    if step == "5b":
         blast_db = cfg.get("blast", {}).get("db", "swissprot")
         if blast_db == "pdbaa":
-            print(f"  Skipping Step 6b (pdbaa hits have PDB IDs directly)\n")
+            print(f"  Skipping Step 5b (pdbaa hits have PDB IDs directly)\n")
             return
 
     args = build_step_args(step, cfg, d)
@@ -316,7 +316,7 @@ def main():
     parser.add_argument("config", type=Path, help="Path to TOML config file")
     parser.add_argument(
         "--steps", nargs="+", default=None,
-        help="Override which steps to run (e.g. --steps 4 5 6 6b 7 8)",
+        help="Override which steps to run (e.g. --steps 4 5 5b 6 7)",
     )
     parser.add_argument(
         "--dry-run", action="store_true",

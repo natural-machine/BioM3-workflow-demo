@@ -1,12 +1,12 @@
-# Pipeline configuration for SH3 analysis only (Steps 5-8)
+# Pipeline configuration for SH3 analysis only (Steps 4-7)
 # Run: python run_pipeline.py configs/pipeline_SH3_analysis.toml
 #
 # NOTE: FASTA files must already exist in outputs/SH3/samples/ from a prior
 # Step 3 run with --fasta --fasta_merge, or from the standalone
-# pipeline/04_samples_to_fasta.sh utility.
+# scripts/samples_to_fasta.sh utility.
 
 [pipeline]
-steps = [5, 6, "6b", 7, 8]
+steps = [4, 5, "5b", 6, 7]
 
 [environments]
 biom3     = "biom3-env"

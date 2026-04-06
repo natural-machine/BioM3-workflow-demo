@@ -17,7 +17,7 @@ See [docs/biom3_ecosystem.md](./docs/biom3_ecosystem.md) for cross-repo workflow
 
 ## Overview
 
-The workflow consists of nine steps:
+The workflow consists of eight steps:
 
 ```txt
 Input CSV (protein sequences + text descriptions)
@@ -34,28 +34,28 @@ Input CSV (protein sequences + text descriptions)
         │
         ├──────────────────────────────┐
         ▼                              ▼
-05_colabfold.sh            06_blast_search.sh
+04_colabfold.sh            05_blast_search.sh
   Structure prediction       BLAST homology search
   (ColabFold/AlphaFold2)     + download reference PDBs (pdbaa only)
         │                              │
-        │                      06b_fetch_hit_structures.sh
+        │                      05b_fetch_hit_structures.sh
         │                        Fetch reference structures
         │                        for SwissProt/other hits
         │                        (experimental PDB + AlphaFold)
         │                              │
         └──────────┬───────────────────┘
                    ▼
-        07_compare_structures.sh  → TMalign structural comparison
+        06_compare_structures.sh  → TMalign structural comparison
                    │
                    ▼
-        08_plot_results.sh        → Visualization (TM-score, RMSD, pLDDT)
+        07_plot_results.sh        → Visualization (TM-score, RMSD, pLDDT)
                    │
                    ▼
-        09_webapp.sh              → Interactive web app (structure viewer,
+        08_webapp.sh              → Interactive web app (structure viewer,
                                     alignment, unmasking order, BLAST)
 ```
 
-Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 5 and 6 can run in parallel. Step 6b is needed when searching non-PDB databases (SwissProt, NR, etc.) to resolve reference structures for BLAST hits. Step 9 launches an interactive web app for exploring outputs.
+Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints or external tools. Inputs and outputs are explicit — you control where data is read from and written to. Steps 4 and 5 can run in parallel. Step 5b is needed when searching non-PDB databases (SwissProt, NR, etc.) to resolve reference structures for BLAST hits. Step 8 launches an interactive web app for exploring outputs.
 
 ## Prerequisites
 
@@ -65,13 +65,13 @@ Each step is a standalone script in `pipeline/` that wraps BioM3 CLI entrypoints
 - Pretrained model weights in the `weights/` directory
 - An NVIDIA GPU (tested on DGX Spark)
 
-**Optional (Steps 5-8):**
+**Optional (Steps 4-7):**
 
-- [ColabFold](https://github.com/sokrypton/ColabFold) — for structure prediction (Step 5)
-- [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html) — for homology search (Step 6)
-- [TMalign](https://zhanggroup.org/TM-align/) — for structural comparison (Step 7)
-- matplotlib, seaborn, pandas — for plotting (Step 8)
-- [Streamlit](https://streamlit.io/), [py3Dmol](https://github.com/arichardsmith/py3Dmol) — for the web app (Step 9, included with BioM3-dev)
+- [ColabFold](https://github.com/sokrypton/ColabFold) — for structure prediction (Step 4)
+- [BLAST+](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html) — for homology search (Step 5)
+- [TMalign](https://zhanggroup.org/TM-align/) — for structural comparison (Step 6)
+- matplotlib, seaborn, pandas — for plotting (Step 7)
+- [Streamlit](https://streamlit.io/), [py3Dmol](https://github.com/arichardsmith/py3Dmol) — for the web app (Step 8, included with BioM3-dev)
 
 ## Installation and setup
 
@@ -98,18 +98,18 @@ python -m pip install git+https://github.com/addison-nm/BioM3-dev.git
 ColabFold and BLAST each require their own conda environment:
 
 ```bash
-# ColabFold (Step 5)
+# ColabFold (Step 4)
 conda create -n colabfold -c conda-forge -c bioconda python=3.13 kalign2=2.04 hhsuite=3.3.0 mmseqs2=18.8cc5c
 conda activate colabfold
 pip install "colabfold[alphafold,openmm]" "jax[cuda]==0.6.2" "openmm[cuda12]"
 
-# BLAST (Step 6)
+# BLAST (Step 5)
 conda create -n blast-env
 conda activate blast-env
 conda install -c bioconda blast
 ```
 
-TMalign (Step 7) must be compiled from source or downloaded as a binary from [https://zhanggroup.org/TM-align/](https://zhanggroup.org/TM-align/) and placed on your PATH.
+TMalign (Step 6) must be compiled from source or downloaded as a binary from [https://zhanggroup.org/TM-align/](https://zhanggroup.org/TM-align/) and placed on your PATH.
 
 ### 4. Weights and databases
 
@@ -145,7 +145,7 @@ This creates the `weights/` subdirectories (LLMs, PenCL, Facilitator, ProteoScri
 ./scripts/sync_databases.sh /data/data-share/BioM3-data-share/databases data/databases
 ```
 
-This is only needed if you plan to run local BLAST searches (Step 6 with `--db <path>`).
+This is only needed if you plan to run local BLAST searches (Step 5 with `--db <path>`).
 
 #### Required weight files
 
@@ -183,14 +183,14 @@ Input CSV files should contain at minimum:
 The recommended way to run the pipeline is with the config-driven runner. Create a TOML config file specifying your inputs, outputs, environments, and which steps to run:
 
 ```bash
-# Full pipeline (Steps 1-8)
+# Full pipeline (Steps 1-7)
 python run_pipeline.py configs/pipeline_SH3.toml
 
-# Analysis only (Steps 4-8)
+# Analysis only (Steps 4-7)
 python run_pipeline.py configs/pipeline_SH3_analysis.toml
 
 # Override steps on the CLI
-python run_pipeline.py configs/pipeline_SH3.toml --steps 6 6b 7 8
+python run_pipeline.py configs/pipeline_SH3.toml --steps 5 5b 6 7
 
 # Preview what would run
 python run_pipeline.py configs/pipeline_SH3.toml --dry-run
@@ -298,40 +298,40 @@ Visualise the diffusion denoising process as GIF animations:
 
 Animations are disabled by default and add negligible overhead when enabled.
 
-### Step 4: Convert to FASTA (standalone utility)
+### Convert to FASTA (standalone utility)
 
-> **Note:** Step 4 is no longer part of the automated pipeline — Step 3 now produces FASTA directly with `--fasta --fasta_merge`. This script is kept as a standalone utility for manual `.pt`-to-FASTA conversion.
+> **Note:** This is no longer part of the automated pipeline — Step 3 now produces FASTA directly with `--fasta --fasta_merge`. This script is kept as a standalone utility for manual `.pt`-to-FASTA conversion.
 
 ```bash
-./pipeline/04_samples_to_fasta.sh <input_pt> <output_dir>
+./scripts/samples_to_fasta.sh <input_pt> <output_dir>
 ```
 
-### Step 5: Structure Prediction (ColabFold)
+### Step 4: Structure Prediction (ColabFold)
 
 Predict 3D structures for generated sequences using ColabFold:
 
 ```bash
 conda activate colabfold
-./pipeline/05_colabfold.sh <fasta_dir> <output_dir>
+./pipeline/04_colabfold.sh <fasta_dir> <output_dir>
 ```
 
 Example:
 
 ```bash
-./pipeline/05_colabfold.sh \
+./pipeline/04_colabfold.sh \
     outputs/SH3/samples \
     outputs/SH3/structures
 ```
 
 This runs `colabfold_batch` on each per-prompt FASTA file and produces PDB structures and a summary CSV with pLDDT and pTM scores.
 
-### Step 6: BLAST Search
+### Step 5: BLAST Search
 
-Search for homologous sequences (can run in parallel with Step 5):
+Search for homologous sequences (can run in parallel with Step 4):
 
 ```bash
 conda activate blast-env
-./pipeline/06_blast_search.sh <fasta_file> <output_dir> [options]
+./pipeline/05_blast_search.sh <fasta_file> <output_dir> [options]
 ```
 
 The `--db` flag accepts any known NCBI database name or a path to a local database. Known names default to remote search; paths always use local search.
@@ -349,7 +349,7 @@ The `--db` flag accepts any known NCBI database name or a path to a local databa
 Example (remote SwissProt search, default):
 
 ```bash
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast
 ```
@@ -357,7 +357,7 @@ Example (remote SwissProt search, default):
 Example (remote PDB search with structure downloads):
 
 ```bash
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db pdbaa
@@ -366,31 +366,31 @@ Example (remote PDB search with structure downloads):
 Example (local SwissProt or NR search):
 
 ```bash
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/swissprot_blast/swissprot --threads 16
 
-./pipeline/06_blast_search.sh \
+./pipeline/05_blast_search.sh \
     outputs/SH3/samples/all_sequences.fasta \
     outputs/SH3/blast \
     --db /path/to/BioM3-data-share/databases/nr_blast/nr --threads 16
 ```
 
-By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). Local copies of SwissProt and NR are available under `BioM3-data-share/databases/` (`swissprot_blast/` and `nr_blast/`). PDB file download only occurs for `pdbaa` hits — for SwissProt or other databases, use Step 6b to fetch reference structures. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
+By default, known database names run as NCBI remote searches. Use `--local` to force a local search (requires the database files on disk or in `BLASTDB`). Local copies of SwissProt and NR are available under `BioM3-data-share/databases/` (`swissprot_blast/` and `nr_blast/`). PDB file download only occurs for `pdbaa` hits — for SwissProt or other databases, use Step 5b to fetch reference structures. Options: `--db`, `--remote`, `--local`, `--threads`, `--max-targets`, `--no-download-pdbs`.
 
-### Step 6b: Fetch Reference Structures
+### Step 5b: Fetch Reference Structures
 
 Fetch 3D structures for BLAST hits from non-PDB databases (SwissProt, NR, etc.). For each UniProt accession, downloads the best experimental structure from RCSB when available, falling back to AlphaFold DB predicted structures. PDB cross-references are resolved from a local `uniprot_sprot.dat.gz` (auto-detected at `../BioM3-data-share/databases/swissprot/`) or via the UniProt REST API.
 
 ```bash
-./pipeline/06b_fetch_hit_structures.sh <blast_tsv> <output_dir> [options]
+./pipeline/05b_fetch_hit_structures.sh <blast_tsv> <output_dir> [options]
 ```
 
 Example:
 
 ```bash
-./pipeline/06b_fetch_hit_structures.sh \
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/blast
 ```
@@ -398,27 +398,27 @@ Example:
 Example (AlphaFold only, skip experimental PDB lookup):
 
 ```bash
-./pipeline/06b_fetch_hit_structures.sh \
+./pipeline/05b_fetch_hit_structures.sh \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/blast --alphafold-only
 ```
 
-Structures are saved as `{accession}.pdb` in `<output_dir>/reference_structures/`, which integrates directly with Step 7. A `structure_manifest.tsv` is written with source metadata (experimental vs. AlphaFold, PDB ID, resolution) for each accession.
+Structures are saved as `{accession}.pdb` in `<output_dir>/reference_structures/`, which integrates directly with Step 6. A `structure_manifest.tsv` is written with source metadata (experimental vs. AlphaFold, PDB ID, resolution) for each accession.
 
 Options: `--swissprot-dat <path>`, `--no-local-dat`, `--alphafold-only`, `--experimental-only`.
 
-### Step 7: Structure Comparison (TMalign)
+### Step 6: Structure Comparison (TMalign)
 
 Compare predicted structures against BLAST reference structures:
 
 ```bash
-./pipeline/07_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
+./pipeline/06_compare_structures.sh <colabfold_csv> <blast_tsv> <structures_dir> <reference_dir> <output_dir>
 ```
 
 Example:
 
 ```bash
-./pipeline/07_compare_structures.sh \
+./pipeline/06_compare_structures.sh \
     outputs/SH3/structures/colabfold_results.csv \
     outputs/SH3/blast/blast_hit_results.tsv \
     outputs/SH3/structures \
@@ -428,18 +428,18 @@ Example:
 
 This produces `results.csv` with TM-score, RMSD, and sequence identity for each query-reference pair.
 
-### Step 8: Plot Results
+### Step 7: Plot Results
 
 Generate plots from the comparison metrics:
 
 ```bash
-./pipeline/08_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
+./pipeline/07_plot_results.sh <results_csv> <output_dir> [--colabfold-csv <path>]
 ```
 
 Example:
 
 ```bash
-./pipeline/08_plot_results.sh \
+./pipeline/07_plot_results.sh \
     outputs/SH3/comparison/results.csv \
     outputs/SH3/images \
     --colabfold-csv outputs/SH3/structures/colabfold_results.csv
@@ -447,12 +447,12 @@ Example:
 
 This produces strip plots for TM-score, RMSD, sequence identity, and (optionally) pLDDT.
 
-### Step 9: Web App
+### Step 8: Web App
 
 Launch the BioM3 interactive web application for exploring pipeline outputs:
 
 ```bash
-./pipeline/09_webapp.sh
+./pipeline/08_webapp.sh
 ```
 
 This starts a Streamlit app at `http://localhost:8501` with six analysis pages:
@@ -463,7 +463,7 @@ This starts a Streamlit app at `http://localhost:8501` with six analysis pages:
 | Align Structures | Superimpose two structures on C-alpha atoms, report RMSD |
 | Highlight Residues | Color selected residue positions on a structure |
 | Color by Values | Map per-residue float values (pLDDT, conservation) onto a structure with colormaps |
-| Unmasking Order | Visualize the diffusion generation order from a Step 3 `.pt` output |
+| Unmasking Order | Visualize the diffusion generation order from a `.pt` output |
 | BLAST Search | Run a remote NCBI BLAST search from a protein sequence |
 
 The app browses data directories configured in `configs/app_data_dirs.json`. By default it exposes `outputs/`, `data/`, and `weights/`. Each page also supports direct file upload.
@@ -475,11 +475,11 @@ Options: `--port PORT` (default: 8501).
 ```
 BioM3-workflow-demo/
 ├── run_pipeline.py                             # Config-driven pipeline runner
-├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 5-8)
+├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 4-7)
 ├── configs/
-│   ├── pipeline_SH3.toml                      # Pipeline config: SH3, full (Steps 1-8)
-│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 5-8)
-│   ├── pipeline_CM.toml                       # Pipeline config: CM, full (Steps 1-8)
+│   ├── pipeline_SH3.toml                      # Pipeline config: SH3, full (Steps 1-7)
+│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 4-7)
+│   ├── pipeline_CM.toml                       # Pipeline config: CM, full (Steps 1-7)
 │   ├── stage3_config_finetune.json            # Finetuning hyperparameters (JSON)
 │   ├── stage1_config_PenCL_inference.json     # PenCL inference config
 │   ├── stage2_config_Facilitator_sample.json  # Facilitator inference config
@@ -493,16 +493,16 @@ BioM3-workflow-demo/
 │   ├── 01_embedding.sh                        # Step 1: CSV → HDF5
 │   ├── 02_finetune.sh                         # Step 2: HDF5 → finetuned model
 │   ├── 03_generate.sh                         # Step 3: prompts → sequences
-│   ├── 04_samples_to_fasta.sh                 # Standalone utility: .pt → FASTA
-│   ├── 05_colabfold.sh                        # Step 5: FASTA → predicted structures
-│   ├── 06_blast_search.sh                     # Step 6: FASTA → BLAST hits
-│   ├── 06b_fetch_hit_structures.sh            # Step 6b: fetch structures for non-PDB hits
-│   ├── 07_compare_structures.sh               # Step 7: TMalign comparison
-│   ├── 08_plot_results.sh                     # Step 8: metric plots
-│   └── 09_webapp.sh                          # Step 9: interactive web app
+│   ├── 04_colabfold.sh                        # Step 4: FASTA → predicted structures
+│   ├── 05_blast_search.sh                     # Step 5: FASTA → BLAST hits
+│   ├── 05b_fetch_hit_structures.sh            # Step 5b: fetch structures for non-PDB hits
+│   ├── 06_compare_structures.sh               # Step 6: TMalign comparison
+│   ├── 07_plot_results.sh                     # Step 7: metric plots
+│   └── 08_webapp.sh                          # Step 8: interactive web app
 ├── scripts/                                    # Helpers and utilities
+│   ├── samples_to_fasta.sh                    # Standalone utility: .pt → FASTA
 │   ├── samples_to_fasta.py                    # Python helper for FASTA conversion
-│   ├── fetch_hit_structures.py                # Python helper for Step 6b
+│   ├── fetch_hit_structures.py                # Python helper for Step 5b
 │   ├── make_plots.py                          # Python helper for Step 8
 │   ├── sync_weights.sh                        # Sync weights from shared directory
 │   └── sync_databases.sh                      # Sync databases from shared directory
@@ -514,10 +514,10 @@ BioM3-workflow-demo/
 │       ├── finetuning/                        # Step 2: checkpoints and logs
 │       ├── generation/                        # Step 3: generated sequences
 │       ├── samples/                           # Step 3: FASTA output (--fasta)
-│       ├── structures/                        # Step 5: ColabFold PDBs and results
-│       ├── blast/                             # Step 6: BLAST hits and reference PDBs
-│       ├── comparison/                        # Step 7: TMalign metrics
-│       └── images/                            # Step 8: plots
+│       ├── structures/                        # Step 4: ColabFold PDBs and results
+│       ├── blast/                             # Step 5: BLAST hits and reference PDBs
+│       ├── comparison/                        # Step 6: TMalign metrics
+│       └── images/                            # Step 7: plots
 └── weights/                                    # Pretrained model weights
 ```
 

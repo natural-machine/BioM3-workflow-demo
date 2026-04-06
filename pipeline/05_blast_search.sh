@@ -1,6 +1,6 @@
 #!/bin/bash
 #=============================================================================
-# Step 6: BLAST Homology Search
+# Step 5: BLAST Homology Search
 #
 # Runs a BLAST protein search (blastp) on generated sequences to find
 # homologous sequences in SwissProt, PDB, NR, or other databases. By default,
@@ -152,7 +152,7 @@ mkdir -p "${outdir}"
 results_fpath="${outdir}/blast_hit_results.tsv"
 
 echo "============================================="
-echo "Step 6: BLAST Homology Search"
+echo "Step 5: BLAST Homology Search"
 echo "============================================="
 echo "Query FASTA:  ${fasta_file}"
 echo "Output dir:   ${outdir}"
