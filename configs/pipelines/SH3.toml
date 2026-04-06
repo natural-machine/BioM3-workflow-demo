@@ -1,5 +1,5 @@
 # Pipeline configuration for SH3 protein family (full pipeline)
-# Run: python run_pipeline.py configs/pipeline_SH3.toml
+# Run: python run_pipeline.py configs/pipelines/SH3.toml
 
 [pipeline]
 steps = [1, 2, 3, 4, 5, "5b", 6, 7]

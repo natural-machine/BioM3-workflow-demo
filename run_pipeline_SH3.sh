@@ -1,7 +1,7 @@
 #!/bin/bash
 #=============================================================================
 # DEPRECATED — Use the config-driven runner instead:
-#   python run_pipeline.py configs/pipeline_SH3_analysis.toml
+#   python run_pipeline.py configs/pipelines/SH3_analysis.toml
 #
 # Analysis Pipeline — SH3 Example
 #

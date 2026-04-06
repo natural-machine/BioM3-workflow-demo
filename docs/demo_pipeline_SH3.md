@@ -219,10 +219,10 @@ If you want to skip finetuning and generate sequences directly, pretrained SH3 w
 After generation, run the analysis pipeline to predict structures, search for homologs, and evaluate results:
 
 ```bash
-python run_pipeline.py configs/pipeline_SH3_analysis.toml
+python run_pipeline.py configs/pipelines/SH3_analysis.toml
 ```
 
-This runs Steps 4 through 7 in sequence, activating the correct environment for each step. Edit `configs/pipeline_SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
+This runs Steps 4 through 7 in sequence, activating the correct environment for each step. Edit `configs/pipelines/SH3_analysis.toml` to point to your `.pt` file and desired output directories. You can also run each step individually:
 
 ### Step 4: Structure Prediction (ColabFold)
 
@@ -290,7 +290,7 @@ Launch the interactive web app to explore pipeline outputs — view and align st
 ./pipeline/08_webapp.sh
 ```
 
-Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_data_dirs.json`. Use `--port` to change the port.
+Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_settings.json`. Use `--port` to change the port.
 
 ## Full pipeline (all commands)
 
@@ -315,7 +315,7 @@ conda activate biom3-env
     data/SH3/SH3_prompts.csv \
     outputs/SH3/generation
 
-# Steps 4-7: analysis (or use: python run_pipeline.py configs/pipeline_SH3_analysis.toml)
+# Steps 4-7: analysis (or use: python run_pipeline.py configs/pipelines/SH3_analysis.toml)
 # 4. ColabFold (requires colabfold env)
 conda activate colabfold
 ./pipeline/04_colabfold.sh \

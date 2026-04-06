@@ -1,5 +1,5 @@
 # Pipeline configuration for CM (Chorismate Mutase) protein family
-# Run: python run_pipeline.py configs/pipeline_CM.toml
+# Run: python run_pipeline.py configs/pipelines/CM.toml
 
 [pipeline]
 steps = [1, 2, 3, 4, 5, "5b", 6, 7]

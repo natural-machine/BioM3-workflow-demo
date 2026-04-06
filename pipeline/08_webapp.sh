@@ -7,7 +7,7 @@
 # visualize diffusion unmasking order, and run BLAST searches.
 #
 # Data directories browsable in the app are configured in
-# configs/app_data_dirs.json. This is passed to biom3_app via --config.
+# configs/app_settings.json. This is passed to biom3_app via --config.
 #
 # USAGE:
 #   ./pipeline/09_webapp.sh [--port PORT]
@@ -47,7 +47,7 @@ done
 projdir=$(cd "$(dirname "$0")/.." && pwd)
 cd "${projdir}"
 
-config="${projdir}/configs/app_data_dirs.json"
+config="${projdir}/configs/app_settings.json"
 
 if [ ! -f "${config}" ]; then
     echo "Error: App config not found: ${config}"

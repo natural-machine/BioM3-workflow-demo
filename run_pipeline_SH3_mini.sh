@@ -16,4 +16,4 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "${SCRIPT_DIR}"
 
-python run_pipeline.py configs/pipeline_SH3_mini.toml "$@"
+python run_pipeline.py configs/pipelines/SH3_mini.toml "$@"

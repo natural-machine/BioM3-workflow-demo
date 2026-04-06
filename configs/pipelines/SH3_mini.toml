@@ -1,5 +1,5 @@
 # Pipeline configuration for SH3 mini subset (quick full-pipeline test)
-# Run: python run_pipeline.py configs/pipeline_SH3_mini.toml
+# Run: python run_pipeline.py configs/pipelines/SH3_mini.toml
 #
 # Uses a 500-row random sample of the full SH3 training data.
 # Regenerate with:

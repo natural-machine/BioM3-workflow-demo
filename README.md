@@ -184,19 +184,19 @@ The recommended way to run the pipeline is with the config-driven runner. Create
 
 ```bash
 # Full pipeline (Steps 1-7)
-python run_pipeline.py configs/pipeline_SH3.toml
+python run_pipeline.py configs/pipelines/SH3.toml
 
 # Analysis only (Steps 4-7)
-python run_pipeline.py configs/pipeline_SH3_analysis.toml
+python run_pipeline.py configs/pipelines/SH3_analysis.toml
 
 # Override steps on the CLI
-python run_pipeline.py configs/pipeline_SH3.toml --steps 5 5b 6 7
+python run_pipeline.py configs/pipelines/SH3.toml --steps 5 5b 6 7
 
 # Preview what would run
-python run_pipeline.py configs/pipeline_SH3.toml --dry-run
+python run_pipeline.py configs/pipelines/SH3.toml --dry-run
 ```
 
-The runner activates the correct conda/venv environment for each step automatically. See `configs/pipeline_SH3.toml` for a full example config.
+The runner activates the correct conda/venv environment for each step automatically. See `configs/pipelines/SH3.toml` for a full example config.
 
 Each step can also be run individually — see the sections below for standalone usage.
 
@@ -466,7 +466,7 @@ This starts a Streamlit app at `http://localhost:8501` with six analysis pages:
 | Unmasking Order | Visualize the diffusion generation order from a `.pt` output |
 | BLAST Search | Run a remote NCBI BLAST search from a protein sequence |
 
-The app browses data directories configured in `configs/app_data_dirs.json`. By default it exposes `outputs/`, `data/`, and `weights/`. Each page also supports direct file upload.
+The app browses data directories configured in `configs/app_settings.json`. By default it exposes `outputs/`, `data/`, and `weights/`. Each page also supports direct file upload.
 
 Options: `--port PORT` (default: 8501).
 
@@ -477,9 +477,11 @@ BioM3-workflow-demo/
 ├── run_pipeline.py                             # Config-driven pipeline runner
 ├── run_pipeline_SH3.sh                         # Legacy analysis pipeline (Steps 4-7)
 ├── configs/
-│   ├── pipeline_SH3.toml                      # Pipeline config: SH3, full (Steps 1-7)
-│   ├── pipeline_SH3_analysis.toml             # Pipeline config: SH3, analysis (Steps 4-7)
-│   ├── pipeline_CM.toml                       # Pipeline config: CM, full (Steps 1-7)
+│   ├── pipelines/                             # TOML pipeline configs
+│   │   ├── SH3.toml                          # SH3 full pipeline (Steps 1-7)
+│   │   ├── SH3_analysis.toml                # SH3 analysis only (Steps 4-7)
+│   │   ├── SH3_mini.toml                    # SH3 mini subset (quick test)
+│   │   └── CM.toml                           # CM full pipeline (Steps 1-7)
 │   ├── stage3_config_finetune.json            # Finetuning hyperparameters (JSON)
 │   ├── stage1_config_PenCL_inference.json     # PenCL inference config
 │   ├── stage2_config_Facilitator_sample.json  # Facilitator inference config
@@ -488,7 +490,7 @@ BioM3-workflow-demo/
 │   │   ├── _base_PenCL.json
 │   │   ├── _base_Facilitator.json
 │   │   └── _base_ProteoScribe_1block.json
-│   └── app_data_dirs.json                    # Web app browsable directories
+│   └── app_settings.json                    # Web app browsable directories
 ├── pipeline/                                   # Pipeline step scripts
 │   ├── 01_embedding.sh                        # Step 1: CSV → HDF5
 │   ├── 02_finetune.sh                         # Step 2: HDF5 → finetuned model

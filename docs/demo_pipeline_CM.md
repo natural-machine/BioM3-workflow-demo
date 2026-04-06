@@ -210,7 +210,7 @@ outputs/CM/samples/                           # FASTA output (--fasta --fasta_me
 After generation, run the analysis pipeline:
 
 ```bash
-python run_pipeline.py configs/pipeline_CM.toml --steps 4 5 5b 6 7
+python run_pipeline.py configs/pipelines/CM.toml --steps 4 5 5b 6 7
 ```
 
 Or run each step individually:
@@ -275,7 +275,7 @@ Launch the interactive web app to explore pipeline outputs — view and align st
 ./pipeline/08_webapp.sh
 ```
 
-Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_data_dirs.json`. Use `--port` to change the port.
+Opens at `http://localhost:8501`. The app browses `outputs/`, `data/`, and `weights/` as configured in `configs/app_settings.json`. Use `--port` to change the port.
 
 ## Full pipeline (all commands)
 
