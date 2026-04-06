@@ -504,7 +504,7 @@ BioM3-workflow-demo/
 │   ├── samples_to_fasta.sh                    # Standalone utility: .pt → FASTA
 │   ├── samples_to_fasta.py                    # Python helper for FASTA conversion
 │   ├── fetch_hit_structures.py                # Python helper for Step 5b
-│   ├── make_plots.py                          # Python helper for Step 8
+│   ├── make_plots.py                          # Python helper for Step 7
 │   ├── sync_weights.sh                        # Sync weights from shared directory
 │   └── sync_databases.sh                      # Sync databases from shared directory
 ├── data/                                       # Input datasets (per family)
@@ -524,7 +524,7 @@ BioM3-workflow-demo/
 
 ## Configuration
 
-### Inference configs (`configs/*.json`)
+### Inference configs (`configs/inference/*.json`)
 
 The JSON config files control model architecture and inference parameters. Most fields should not need modification unless you are using different backbone weights. The Stage 3 config includes sampling parameters you may want to adjust:
 

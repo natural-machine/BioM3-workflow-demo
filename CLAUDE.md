@@ -37,8 +37,8 @@ outputs/            # Pipeline outputs per step (gitignored)
 logs/               # Training and pipeline logs (gitignored)
 docs/               # Demo walkthroughs (SH3, CM) and session notes
 run_pipeline.py     # Pipeline runner (executes steps sequentially)
-run_pipeline_SH3.sh # Convenience wrapper for SH3 demo
 environment.sh      # Environment variables (source before running)
+VERSION             # Single-source version (PEP 440)
 ```
 
 ## Building and running
@@ -47,7 +47,7 @@ Requires BioM3-dev installed (`pip install git+https://github.com/addison-nm/Bio
 
 ```bash
 source environment.sh
-python run_pipeline.py configs/pipeline_SH3.toml   # full pipeline
+python run_pipeline.py configs/pipelines/SH3.toml   # full pipeline
 ./pipeline/01_embedding.sh                          # individual step
 ```
 
